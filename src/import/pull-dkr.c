@@ -1057,7 +1057,7 @@ int dkr_pull_start(DkrPull *i, const char *name, const char *reference, const ch
 
 	url = strjoina(i->index_url, "/v1/repositories/", name, "/images");
 	
-        r = pull_job_new(&i->images_job, url, i->glue);
+        r = pull_job_new(&i->images_job, url, i->glue, i);
         if (r < 0)
                 return r;
 
