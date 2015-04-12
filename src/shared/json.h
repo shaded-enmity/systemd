@@ -38,12 +38,45 @@ enum {
         JSON_NULL,
 };
 
+enum {
+	JSON_VARIANT_INVALID,
+	JSON_VARIANT_STRING,
+	JSON_VARIANT_INTEGER,
+	JSON_VARIANT_BOOLEAN,
+	JSON_VARIANT_REAL,
+	JSON_VARIANT_ARRAY,
+	JSON_VARIANT_OBJECT
+};
+
 union json_value {
         bool boolean;
         double real;
         intmax_t integer;
 };
 
+typedef struct json_variant {
+	union {
+		char *string;
+		struct json_variant *obj;
+		union json_value value;
+	};
+	int type;
+	unsigned size;
+} json_variant;
+
+json_variant *json_variant_new(int json_type, unsigned size);
+json_variant *json_variant_unref(json_variant *);
+DEFINE_TRIVIAL_CLEANUP_FUNC(json_variant *, json_variant_unref);
+
+char *json_variant_string(json_variant *);
+bool json_variant_bool(json_variant *);
+intmax_t json_variant_integer(json_variant *);
+double json_variant_real(json_variant *);
+
+json_variant *json_variant_element(json_variant *, unsigned index);
+json_variant *json_variant_value(json_variant *, const char *key);
+
 #define JSON_VALUE_NULL ((union json_value) {})
 
 int json_tokenize(const char **p, char **ret_string, union json_value *ret_value, void **state, unsigned *line);
+int json_parse(const char *string, json_variant *ret_variant);

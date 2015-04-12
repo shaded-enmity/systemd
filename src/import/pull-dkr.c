@@ -621,29 +621,29 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 		// directly fetch the image manifest from the V2 registry
 		// effectively skipping the `tags` job in V2 workflow
                 url = strjoina(PROTOCOL_PREFIX, i->response_registries[0], "/v2/", i->name, "/manifests/", i->tag);
-                r = pull_job_new(&i->tags_job, url, i->glue, i);
+                r = pull_job_new(&i->ancestry_job, url, i->glue, i);
                 if (r < 0) {
                         log_error_errno(r, "Failed to allocate tags job: %m");
                         goto finish;
                 }
 
-                r = dkr_pull_add_token(i, i->tags_job);
+                r = dkr_pull_add_token(i, i->ancestry_job);
                 if (r < 0) {
                         log_oom();
                         goto finish;
                 }
 
-                i->tags_job->on_finished = dkr_pull_job_on_finished_v2;
-                i->tags_job->on_progress = dkr_pull_job_on_progress;
+                i->ancestry_job->on_finished = dkr_pull_job_on_finished_v2;
+                i->ancestry_job->on_progress = dkr_pull_job_on_progress;
 
-                r = pull_job_begin(i->tags_job);
+                r = pull_job_begin(i->ancestry_job);
                 if (r < 0) {
                         log_error_errno(r, "Failed to start tags job: %m");
                         goto finish;
                 }
 		
         } else if (i->ancestry_job == j) {
-                char **ancestry = NULL, **k;
+                //char **ancestry = NULL, **k;
                 unsigned n;
 
                 assert(!i->layer_job);
@@ -1057,7 +1057,7 @@ int dkr_pull_start(DkrPull *i, const char *name, const char *reference, const ch
 
 	url = strjoina(i->index_url, "/v1/repositories/", name, "/images");
 	
-        r = pull_job_new(&i->images_job, url, i->glue);
+        r = pull_job_new(&i->images_job, url, i->glue, i);
         if (r < 0)
                 return r;
 
