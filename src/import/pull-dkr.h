@@ -24,6 +24,8 @@
 #include "sd-event.h"
 #include "util.h"
 
+enum PullStrategy { PULL_INVALID, PULL_V1, PULL_V2 };
+
 typedef struct DkrPull DkrPull;
 
 typedef void (*DkrPullFinished)(DkrPull *pull, int error, void *userdata);
