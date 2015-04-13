@@ -65,7 +65,7 @@ typedef struct json_variant {
 } json_variant;
 
 json_variant *json_variant_new(int json_type, unsigned size);
-json_variant *json_variant_unref(json_variant * );
+json_variant *json_variant_unref(json_variant *);
 DEFINE_TRIVIAL_CLEANUP_FUNC(json_variant *, json_variant_unref);
 
 char *json_variant_string(json_variant *);
@@ -74,7 +74,7 @@ intmax_t json_variant_integer(json_variant *);
 double json_variant_real(json_variant *);
 
 json_variant *json_variant_element(json_variant *, unsigned index);
-json_variant *json_variant_value(json_variant*, const char * key);
+json_variant *json_variant_value(json_variant *, const char *key);
 
 #define JSON_VALUE_NULL ((union json_value) {})
 

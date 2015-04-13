@@ -33,6 +33,86 @@ enum {
         STATE_VALUE_POST,
 };
 
+
+json_variant *json_variant_new(int type, unsigned size) {
+	json_variant *v = malloc(sizeof(*v));
+	v->type = type;
+	v->size = size;
+	v->obj  = NULL;
+	return v;
+}
+
+static json_variant *json_array_unref(json_variant *variant) {
+	for (int i = 0; i < variant->size; ++i) { 
+		json_variant_unref(variant->array + i);
+	}
+
+	free(variant);
+	return NULL;
+}
+
+static json_variant *json_object_unref(json_variant *variant) {
+	for (int i = 0; i < variant->size * 2; ++i) { 
+		json_variant_unref(variant->obj + i);
+	}
+
+	free(variant);
+	return NULL;
+}
+
+json_variant *json_variant_unref(json_variant *variant) {
+	if (variant->type == JSON_VARIANT_ARRAY)
+		return json_array_unref(variant);
+
+	else if(variant->type == JSON_VARIANT_OBJECT)
+		return json_object_unref(variant);
+
+	else if(variant->type == JSON_VARIANT_STRING)
+		free(variant->string);
+
+	free(variant);
+	return NULL;
+}
+
+char *json_variant_string(json_variant *variant){
+	assert(variant->type == JSON_VARIANT_STRING);
+	return variant->string;
+}
+
+bool json_variant_bool(json_variant *variant) {
+	assert(variant->type == JSON_VARIANT_BOOL);
+	return variant->value->bool;
+}
+
+intmax_t json_variant_integer(json_variant *variant) {
+	assert(variant->type == JSON_VARIANT_INTEGER);
+	return variant->value->integer;
+}
+
+double json_variant_real(json_variant *variant) {
+	assert(variant->type == JSON_VARIANT_REAL);
+	return variant->value->real;
+}
+
+json_variant *json_variant_element(json_variant *variant, unsigned index) {
+	assert(variant->type == JSON_VARIANT_ARRAY);
+	assert(index < variant->size);
+
+	return variant->array + index;
+}
+
+json_variant *json_variant_value(json_variant *variant, const char *key) {
+	assert(variant->type == JSON_VARIANT_OBJECT);
+
+	for (int i = 0; i < variant->size * 2; i += 2) {
+		json_variant *p = variant->obj + i;
+		if (p->type == JSON_VARIANT_STRING && strcmp(key, p->string) == 0)
+			return p + 1;
+	}
+
+	return NULL;
+}
+
 static void inc_lines(unsigned *line, const char *s, size_t n) {
         const char *p = s;
 
