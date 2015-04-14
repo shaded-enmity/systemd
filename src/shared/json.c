@@ -81,7 +81,7 @@ char *json_variant_string(json_variant *variant){
 
 bool json_variant_bool(json_variant *variant) {
 	assert(variant->type == JSON_VARIANT_BOOL);
-	return variant->value->bool;
+	return variant->value->boolean;
 }
 
 intmax_t json_variant_integer(json_variant *variant) {
