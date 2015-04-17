@@ -629,7 +629,7 @@ static int json_scoped_parse(Set *tokens, Iterator *i, json_variant *scope) {
 
 		if (state == STATE_KEY) { 
 			if (var->type != JSON_VARIANT_STRING) {
-                                log_info("key not a string");
+                                log_info("key not a string (%i)", var->type);
 				return -EBADMSG;
 			}
 			else {
