@@ -743,6 +743,9 @@ static int json_tokens(const char *string, size_t size, Set* tokens) {
 
         	p = buf;
 		t = json_tokenize(&p, &rstr, &v, &json_state, NULL);
+
+                log_info("t = %i", t);
+
 		if (t < 0)
 			return t;
                 else if (t == JSON_END)
