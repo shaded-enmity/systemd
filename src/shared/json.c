@@ -614,7 +614,7 @@ static int json_scoped_parse(Set *tokens, Iterator *i, json_variant *scope) {
 	json_variant *items = NULL;
 	size_t allocated = 0, size = 0;
 
-        while((e = set_iterate(tokens, &i)) != NULL) {
+        while((e = set_iterate(tokens, i)) != NULL) {
 		json_variant *var = (json_variant *)e;
 
                 bool stopper = !json_is_value(var) && var->value.integer == terminator;
@@ -639,7 +639,7 @@ static int json_scoped_parse(Set *tokens, Iterator *i, json_variant *scope) {
 			if (json_is_value(var))
 				return -EBADMSG;
 
-			if (var->value->integer != JSON_COLON)
+                        if (var->value.integer != JSON_COLON)
 				return -EBADMSG;
 
 			state = STATE_VALUE;
