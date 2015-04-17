@@ -36,7 +36,7 @@ enum {
 
 
 json_variant *json_variant_new(int type) {
-	json_variant *v = new0(*v, 1);
+        json_variant *v = new0(json_variant, 1);
 	v->type = type;
         v->size = 0;
 	v->obj  = NULL;
