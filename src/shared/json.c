@@ -140,21 +140,21 @@ bool json_variant_bool(json_variant *variant) {
 	assert(variant);
         assert(variant->type == JSON_VARIANT_BOOLEAN);
 
-	return variant->value->boolean;
+        return variant->value.boolean;
 }
 
 intmax_t json_variant_integer(json_variant *variant) {
 	assert(variant);
 	assert(variant->type == JSON_VARIANT_INTEGER);
 
-	return variant->value->integer;
+        return variant->value.integer;
 }
 
 double json_variant_real(json_variant *variant) {
 	assert(variant);
 	assert(variant->type == JSON_VARIANT_REAL);
 
-	return variant->value->real;
+        return variant->value.real;
 }
 
 json_variant *json_variant_element(json_variant *variant, unsigned index) {
