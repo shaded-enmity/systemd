@@ -35,7 +35,7 @@ enum {
 };
 
 
-json_variant *json_variant_new(int type, unsigned size) {
+json_variant *json_variant_new(int type, unsigned size = 0) {
 	json_variant *v = new0(*v, 1);
 	v->type = type;
 	v->size = size;
@@ -43,15 +43,59 @@ json_variant *json_variant_new(int type, unsigned size) {
 	return v;
 }
 
+static json_variant json_variant_deep_copy(json_variant *variant) {
+	assert(variant);
+
+	json_variant v;
+	v.type = variant->type;
+	v.size = variant->size;
+
+	if (variant->type == JSON_VARIANT_STRING)
+		v->string = strndup(variant->string, variant->size);
+	else if (variant->type == JSON_VARIANT_ARRAY) {
+		v.obj = new0(json_variant, variant->size);
+		for (int = 0; i < variant->size; ++i) {
+			v.obj[i] = json_variant_deep_copy(variant->obj[i]);
+		}
+	} 
+	else if (variant->type == JSON_VARIANT_OBJECT) {
+		v.obj = new0(json_variant, variant->size * 2);
+		for (int = 0; i < variant->size * 2; ++i) {
+			v.obj[i] = json_variant_deep_copy(variant->obj[i]);
+		}
+	} 
+	else
+		v->value = variant->value;
+
+	return v;
+}
+
+static json_variant json_variant_shallow_copy(json_variant *variant) {
+	assert(variant);
+	assert(variant->type != JSON_VARIANT_ARRAY);
+	assert(variant->type != JSON_VARIANT_OBJECT);
+
+	json_variant v;
+
+	v.type = variant->type;
+	v.size = variant->size;
+	if (variant->type == JSON_VARIANT_STRING)
+		v->string = strndup(variant->string, variant->size);
+	else
+		v->value = variant->value;		
+
+	return v;
+}
+
 static json_variant *json_array_unref(json_variant *variant) {
 	assert(variant);
-	assert(variant->array);
+	assert(variant->obj);
 
 	for (int i = 0; i < variant->size; ++i) { 
-		json_variant_unref(variant->array + i);
+		json_variant_unref(variant->obj + i);
 	}
 
-	free(variant);
+	//free(variant);
 	return NULL;
 }
 
@@ -63,7 +107,7 @@ static json_variant *json_object_unref(json_variant *variant) {
 		json_variant_unref(variant->obj + i);
 	}
 
-	free(variant);
+	//free(variant);
 	return NULL;
 }
 
@@ -74,10 +118,10 @@ json_variant *json_variant_unref(json_variant *variant) {
 	if (variant->type == JSON_VARIANT_ARRAY)
 		return json_array_unref(variant);
 
-	else if(variant->type == JSON_VARIANT_OBJECT)
+	else if (variant->type == JSON_VARIANT_OBJECT)
 		return json_object_unref(variant);
 
-	else if(variant->type == JSON_VARIANT_STRING)
+	else if (variant->type == JSON_VARIANT_STRING)
 		free(variant->string);
 
 	free(variant);
@@ -545,11 +589,17 @@ int json_tokenize(
 }
 
 static bool json_is_value(json_variant *var) {
+	assert(var);
+
 	return var->type != JSON_VARIANT_CONTROL;
 }
 
 static int json_scoped_parse(Set *tokens, Iterator *i, json_variant *scope) {
-	void *e;
+	assert(tokens);
+	assert(i);
+	assert(scope);
+
+	void *e = NULL;
 	bool arr = scope->type == JSON_VARIANT_ARRAY;
 	int terminator = arr ? JSON_ARRAY_CLOSE : JSON_OBJECT_CLOSE;
 	enum {
@@ -558,7 +608,9 @@ static int json_scoped_parse(Set *tokens, Iterator *i, json_variant *scope) {
 		STATE_COMMA,
 		STATE_VALUE
 	} state = arr ? STATE_VALUE : STATE_KEY;
-	json_variant *key, *value;
+	json_variant *key = NULL, *value = NULL;
+	json_variant *items = NULL;
+	size_t allocated = 0, size = 0;
 
 	while((e = set_iterate(tokens, &it)) != NULL) {
 		json_variant *var = (json_variant *)e;
@@ -567,7 +619,6 @@ static int json_scoped_parse(Set *tokens, Iterator *i, json_variant *scope) {
 		if (stopper) {
 			if (state != STATE_COMMA)
 				return -EBADMSG;
-			break;
 		}
 
 		if (state == STATE_KEY) { 
@@ -582,33 +633,82 @@ static int json_scoped_parse(Set *tokens, Iterator *i, json_variant *scope) {
 		else if (state == STATE_COLON) {
 			if (key == NULL) 
 				return -EBADMSG;
+			
+			if (json_is_value(var))
+				return -EBADMSG;
+
+			if (var->value->integer != JSON_COLON)
+				return -EBADMSG;
+
 			state = STATE_VALUE;
 		}
 		else if (state == STATE_VALUE) {
-			if (!json_is_value(var)) 
-				json_scoped_parse(tokens, i);
+			_cleanup_(json_variant_unrefp) json_variant* n = NULL;
+
+			if (!json_is_value(var)) {
+				int type = (var->type == JSON_ARRAY_OPEN) ? JSON_VARIANT_ARRAY : JSON_VARIANT_OBJECT;
+
+				n = json_variant_new(type, 1);
+
+				if (0 > json_scoped_parse(tokens, i, n)) {
+					return -EBADMSG;
+				}
+
+				value = n;
+			} 
 			else
 				value = var;
-			
+		
+			size_t toadd = arr ? 1 : 2;
+			if(!GREEDY_REALLOC(items, allocated, size + toadd))
+				return -ENOMEM;
+
+			if (arr)
+				items[size    ] = json_variant_deep_copy(value);
+			else {
+				items[size    ] = json_variant_deep_copy(key);
+				items[size + 1] = json_variant_deep_copy(value);
+			}
+
+			size += toadd;
 		}
 		else if (state == STATE_COMMA) {
+			if (json_is_value(var))
+				return -EBADMSG;
 
+			if (var->value->integer != JSON_COMMA)
+				return -EBADMSG;
+
+			key = NULL;
+			value = NULL;
+
+			state = arr ? STATE_VALUE : STATE_KEY
 		}
 	}
+
+	scope->size = size;
+	scope->obj = items;
+
+	return scope->type;
 }
 
-int json_parse(Set *tokens, json_variant **ret_variant) {
+static int json_parse_tokens(Set *tokens, json_variant **ret_variant) {
 
 	assert(tokens);
 	assert(*ret_variant);
 
 	Iterator it = ITERATOR_FIRST;
-	void *e;
-	
-	while((e = set_iterate(tokens, &it)) != NULL) {
-		
-	}
+	json_variant *e = (json_variant *)set_iterate(tokens, &it);
 
+	*ret_variant = json_variant_new(JSON_VARIANT_OBJECT, 0);
+
+	if (e->type != JSON_VARIANT_CONTROL && e->value->integer != JSON_OBJECT_OPEN)
+		return -EBADMSG;
+
+	if (0 > json_scoped_parse(tokens, &it, *ret_variant))
+		return -EBADMSG;
+
+	return *ret_variant->type;
 }
 
 static int json_tokens(const char *string, size_t size, Set* tokens) {
@@ -640,7 +740,7 @@ static int json_tokens(const char *string, size_t size, Set* tokens) {
 			return t;
 
 		if (t <= JSON_ARRAY_OPEN) {
-			var = json_variant_new(JSON_VARIANT_CONTROL, 1);
+			var = json_variant_new(JSON_VARIANT_CONTROL);
 			var->value->integer = t;
 		} else {
 			switch (t) {
@@ -649,19 +749,19 @@ static int json_tokens(const char *string, size_t size, Set* tokens) {
 				var->string = rstr;
 				break;
 			case JSON_INTEGER:
-				var = json_variant_new(JSON_VARIANT_INTEGER, 1);
+				var = json_variant_new(JSON_VARIANT_INTEGER);
 				var->value = v;
 				break;
 			case JSON_REAL:
-				var = json_variant_new(JSON_VARIANT_REAL, 1);
+				var = json_variant_new(JSON_VARIANT_REAL);
 				var->value = v;
 				break;
 			case JSON_BOOLEAN:
-				var = json_variant_new(JSON_VARIANT_BOOLEAN, 1);
+				var = json_variant_new(JSON_VARIANT_BOOLEAN);
 				var->value = v;
 				break;
 			case JSON_NULL:
-				var = json_variant_new(JSON_VARIANT_NULL, 1);
+				var = json_variant_new(JSON_VARIANT_NULL);
 				break;
 			}
 		}
@@ -670,4 +770,24 @@ static int json_tokens(const char *string, size_t size, Set* tokens) {
 	}
 
 	return JSON_VARIANT_OBJECT;
+}
+
+
+int json_parse(const char *string, json_variant **ret_variant) {
+
+	assert(string);
+	assert(*ret_variant);
+
+	Set *s = set_new(NULL);
+	assert(s);
+
+	if (0 > json_tokens(string, strlen(string), s))
+		return -EBADMSG;
+
+	json_variant *v = json_variant_new(JSON_VARIANT_OBJECT);
+	if (0 > json_parse_tokens(s, v))
+		return -EBADMSG;
+
+	*ret_variant = v;
+	return v->type;
 }
