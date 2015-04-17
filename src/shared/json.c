@@ -81,9 +81,9 @@ static json_variant json_variant_shallow_copy(json_variant *variant) {
 	v.type = variant->type;
 	v.size = variant->size;
 	if (variant->type == JSON_VARIANT_STRING)
-		v->string = strndup(variant->string, variant->size);
+                v.string = strndup(variant->string, variant->size);
 	else
-		v->value = variant->value;		
+                v.value = variant->value;
 
 	return v;
 }
@@ -92,8 +92,8 @@ static json_variant *json_array_unref(json_variant *variant) {
 	assert(variant);
 	assert(variant->obj);
 
-	for (int i = 0; i < variant->size; ++i) { 
-		json_variant_unref(variant->obj + i);
+        for (unsigned i = 0; i < variant->size; ++i) {
+                json_variant_unref(variant->obj + i);
 	}
 
 	//free(variant);
@@ -104,8 +104,8 @@ static json_variant *json_object_unref(json_variant *variant) {
 	assert(variant);
 	assert(variant->obj);
 
-	for (int i = 0; i < variant->size * 2; ++i) { 
-		json_variant_unref(variant->obj + i);
+        for (unsigned i = 0; i < variant->size * 2; ++i) {
+                json_variant_unref(variant->obj + i);
 	}
 
 	//free(variant);
