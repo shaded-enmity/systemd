@@ -684,7 +684,7 @@ static int json_scoped_parse(Set *tokens, Iterator *i, json_variant *scope) {
 			key = NULL;
 			value = NULL;
 
-			state = arr ? STATE_VALUE : STATE_KEY
+                        state = arr ? STATE_VALUE : STATE_KEY;
 		}
 	}
 
@@ -710,7 +710,7 @@ static int json_parse_tokens(Set *tokens, json_variant **ret_variant) {
 	if (0 > json_scoped_parse(tokens, &it, *ret_variant))
 		return -EBADMSG;
 
-	return *ret_variant->type;
+        return (*ret_variant)->type;
 }
 
 static int json_tokens(const char *string, size_t size, Set* tokens) {
