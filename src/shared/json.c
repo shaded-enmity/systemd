@@ -161,15 +161,16 @@ json_variant *json_variant_element(json_variant *variant, unsigned index) {
 	assert(variant);
 	assert(variant->type == JSON_VARIANT_ARRAY);
 	assert(index < variant->size);
+        assert(variant->obj);
 
-	return variant->array + index;
+        return variant->obj + index;
 }
 
 json_variant *json_variant_value(json_variant *variant, const char *key) {
 	assert(variant);
 	assert(variant->type == JSON_VARIANT_OBJECT);
 
-	for (int i = 0; i < variant->size * 2; i += 2) {
+        for (unsigned i = 0; i < variant->size * 2; i += 2) {
 		json_variant *p = variant->obj + i;
 		if (p->type == JSON_VARIANT_STRING && strcmp(key, p->string) == 0)
 			return p + 1;
