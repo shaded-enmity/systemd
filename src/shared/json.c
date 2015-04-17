@@ -620,6 +620,8 @@ static int json_scoped_parse(Set *tokens, Iterator *i, json_variant *scope) {
                 json_variant *var = (json_variant *)e;
                 bool stopper = !json_is_value(var) && var->value.integer == terminator;
 
+                log_info("var: %i", var->type);
+
 		if (stopper) {
                         if (state != STATE_COMMA) {
                                 log_info("Unexpected stopper");
