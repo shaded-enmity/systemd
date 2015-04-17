@@ -645,6 +645,7 @@ static int json_scoped_parse(Set *tokens, Iterator *i, json_variant *scope) {
 		}
 		else if (state == STATE_VALUE) {
 			_cleanup_(json_variant_unrefp) json_variant* n = NULL;
+                        size_t toadd = arr ? 1 : 2;
 
 			if (!json_is_value(var)) {
 				int type = (var->type == JSON_ARRAY_OPEN) ? JSON_VARIANT_ARRAY : JSON_VARIANT_OBJECT;
@@ -660,7 +661,6 @@ static int json_scoped_parse(Set *tokens, Iterator *i, json_variant *scope) {
 			else
 				value = var;
 		
-			size_t toadd = arr ? 1 : 2;
 			if(!GREEDY_REALLOC(items, allocated, size + toadd))
 				return -ENOMEM;
 
@@ -790,7 +790,7 @@ int json_parse(const char *string, json_variant **ret_variant) {
 	if (0 > json_tokens(string, strlen(string), s))
 		return -EBADMSG;
 
-        *v = json_variant_new(JSON_VARIANT_OBJECT);
+        v = json_variant_new(JSON_VARIANT_OBJECT);
         if (0 > json_parse_tokens(s, &v))
 		return -EBADMSG;
 
