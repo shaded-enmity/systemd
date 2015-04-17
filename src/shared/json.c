@@ -720,6 +720,7 @@ static int json_tokens(const char *string, size_t size, Set* tokens) {
         _cleanup_free_ char *buf = NULL;
         union json_value v = {};
         void *json_state = NULL;
+        json_variant *var;
         const char *p;
         int t;
        
@@ -729,7 +730,7 @@ static int json_tokens(const char *string, size_t size, Set* tokens) {
         if (memchr(string, 0, size))
                 return -EBADMSG;
 
-        buf = strndup(payload, size);
+        buf = strndup(string, size);
         if (!buf)
                 return -ENOMEM;
 
