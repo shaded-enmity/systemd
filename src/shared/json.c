@@ -528,7 +528,6 @@ int json_tokenize(
 
                         } else if (strchr("-0123456789", *c)) {
                                 r = json_parse_number(&c, ret_value);
-                                log_info("num %s (%i)", c, r);
                                 if (r < 0)
                                         return r;
 
@@ -710,6 +709,8 @@ static int json_parse_tokens(Set *tokens, json_variant **ret_variant) {
 
         if (e->type != JSON_VARIANT_CONTROL && e->value.integer != JSON_OBJECT_OPEN)
 		return -EBADMSG;
+
+        log_info("parsing scope");
 
 	if (0 > json_scoped_parse(tokens, &it, *ret_variant))
 		return -EBADMSG;
