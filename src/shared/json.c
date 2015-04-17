@@ -28,11 +28,6 @@
 #include "json.h"
 #include "set.h"
 
-enum {
-        STATE_NULL,
-        STATE_VALUE,
-        STATE_VALUE_POST,
-};
 
 
 json_variant *json_variant_new(int type) {
@@ -71,6 +66,7 @@ static json_variant json_variant_deep_copy(json_variant *variant) {
 	return v;
 }
 
+/*
 static json_variant json_variant_shallow_copy(json_variant *variant) {
         json_variant v;
 
@@ -87,6 +83,7 @@ static json_variant json_variant_shallow_copy(json_variant *variant) {
 
 	return v;
 }
+*/
 
 static json_variant *json_array_unref(json_variant *variant) {
 	assert(variant);
@@ -455,6 +452,12 @@ int json_tokenize(
         const char *c;
         int t;
         int r;
+
+        enum {
+                STATE_NULL,
+                STATE_VALUE,
+                STATE_VALUE_POST,
+        };
 
         assert(p);
         assert(*p);
