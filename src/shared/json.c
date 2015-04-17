@@ -528,6 +528,7 @@ int json_tokenize(
 
                         } else if (strchr("-0123456789", *c)) {
                                 r = json_parse_number(&c, ret_value);
+                                log_info("num %s (%i)", c, r);
                                 if (r < 0)
                                         return r;
 
