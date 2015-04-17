@@ -621,12 +621,15 @@ static int json_scoped_parse(Set *tokens, Iterator *i, json_variant *scope) {
                 bool stopper = !json_is_value(var) && var->value.integer == terminator;
 
 		if (stopper) {
-			if (state != STATE_COMMA)
+                        if (state != STATE_COMMA) {
+                                log_info("Unexpected stopper");
 				return -EBADMSG;
+                        }
 		}
 
 		if (state == STATE_KEY) { 
 			if (var->type != JSON_VARIANT_STRING) {
+                                log_info("key not a string");
 				return -EBADMSG;
 			}
 			else {
@@ -635,14 +638,20 @@ static int json_scoped_parse(Set *tokens, Iterator *i, json_variant *scope) {
 			}
 		} 
 		else if (state == STATE_COLON) {
-			if (key == NULL) 
+                        if (key == NULL) {
+                                log_info("key null");
 				return -EBADMSG;
+                        }
 			
-			if (json_is_value(var))
+                        if (json_is_value(var)) {
+                                log_info("unexpected value token");
 				return -EBADMSG;
+                        }
 
-                        if (var->value.integer != JSON_COLON)
+                        if (var->value.integer != JSON_COLON) {
+                                log_info("not a colon");
 				return -EBADMSG;
+                        }
 
 			state = STATE_VALUE;
 		}
@@ -656,6 +665,7 @@ static int json_scoped_parse(Set *tokens, Iterator *i, json_variant *scope) {
                                 n = json_variant_new(type);
 
 				if (0 > json_scoped_parse(tokens, i, n)) {
+                                        log_info("error parsing sub-scope");
 					return -EBADMSG;
 				}
 
@@ -677,11 +687,15 @@ static int json_scoped_parse(Set *tokens, Iterator *i, json_variant *scope) {
 			size += toadd;
 		}
 		else if (state == STATE_COMMA) {
-			if (json_is_value(var))
+                        if (json_is_value(var)) {
+                                log_info("unexpected value, expected comma");
 				return -EBADMSG;
+                        }
 
-                        if (var->value.integer != JSON_COMMA)
+                        if (var->value.integer != JSON_COMMA) {
+                                log_info("unexpected control character, expected comma");
 				return -EBADMSG;
+                        }
 
 			key = NULL;
 			value = NULL;
