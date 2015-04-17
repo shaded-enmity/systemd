@@ -635,6 +635,7 @@ static int json_scoped_parse(Set *tokens, Iterator *i, json_variant *scope) {
 				return -EBADMSG;
 			}
 			else {
+                                log_info("key: %s", var->string);
 				key = var;
 				state = STATE_COLON;
 			}
@@ -761,8 +762,6 @@ static int json_tokens(const char *string, size_t size, Set* tokens) {
 		_cleanup_free_ char *rstr = NULL;
 
 		t = json_tokenize(&p, &rstr, &v, &json_state, NULL);
-
-                log_info("t = %i", t);
 
 		if (t < 0)
 			return t;
