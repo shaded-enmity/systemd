@@ -65,7 +65,7 @@ typedef struct json_variant {
 	unsigned size;
 } json_variant;
 
-json_variant *json_variant_new(int json_type, unsigned size);
+json_variant *json_variant_new(int json_type);
 json_variant *json_variant_unref(json_variant *);
 DEFINE_TRIVIAL_CLEANUP_FUNC(json_variant *, json_variant_unref);
 

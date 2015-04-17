@@ -35,10 +35,10 @@ enum {
 };
 
 
-json_variant *json_variant_new(int type, unsigned size = 0) {
+json_variant *json_variant_new(int type) {
 	json_variant *v = new0(*v, 1);
 	v->type = type;
-	v->size = size;
+        v->size = 0;
 	v->obj  = NULL;
 	return v;
 }
@@ -648,7 +648,7 @@ static int json_scoped_parse(Set *tokens, Iterator *i, json_variant *scope) {
 			if (!json_is_value(var)) {
 				int type = (var->type == JSON_ARRAY_OPEN) ? JSON_VARIANT_ARRAY : JSON_VARIANT_OBJECT;
 
-				n = json_variant_new(type, 1);
+                                n = json_variant_new(type);
 
 				if (0 > json_scoped_parse(tokens, i, n)) {
 					return -EBADMSG;
@@ -745,7 +745,8 @@ static int json_tokens(const char *string, size_t size, Set* tokens) {
 		} else {
 			switch (t) {
 			case JSON_STRING:
-				var = json_variant_new(JSON_VARIANT_STRING, strlen(rstr));
+                                var = json_variant_new(JSON_VARIANT_STRING);
+                                var->size = strlen(rstr);
 				var->string = rstr;
 				break;
 			case JSON_INTEGER:
