@@ -614,10 +614,10 @@ static int json_scoped_parse(Set *tokens, Iterator *i, json_variant *scope) {
 	json_variant *items = NULL;
 	size_t allocated = 0, size = 0;
 
-	while((e = set_iterate(tokens, &it)) != NULL) {
+        while((e = set_iterate(tokens, &i)) != NULL) {
 		json_variant *var = (json_variant *)e;
 
-		bool stopper = !json_is_value(var) && var->value->integer == terminator;
+                bool stopper = !json_is_value(var) && var->value.integer == terminator;
 		if (stopper) {
 			if (state != STATE_COMMA)
 				return -EBADMSG;
@@ -678,7 +678,7 @@ static int json_scoped_parse(Set *tokens, Iterator *i, json_variant *scope) {
 			if (json_is_value(var))
 				return -EBADMSG;
 
-			if (var->value->integer != JSON_COMMA)
+                        if (var->value.integer != JSON_COMMA)
 				return -EBADMSG;
 
 			key = NULL;
@@ -702,9 +702,9 @@ static int json_parse_tokens(Set *tokens, json_variant **ret_variant) {
 	Iterator it = ITERATOR_FIRST;
 	json_variant *e = (json_variant *)set_iterate(tokens, &it);
 
-	*ret_variant = json_variant_new(JSON_VARIANT_OBJECT, 0);
+        *ret_variant = json_variant_new(JSON_VARIANT_OBJECT);
 
-	if (e->type != JSON_VARIANT_CONTROL && e->value->integer != JSON_OBJECT_OPEN)
+        if (e->type != JSON_VARIANT_CONTROL && e->value.integer != JSON_OBJECT_OPEN)
 		return -EBADMSG;
 
 	if (0 > json_scoped_parse(tokens, &it, *ret_variant))
@@ -743,7 +743,7 @@ static int json_tokens(const char *string, size_t size, Set* tokens) {
 
 		if (t <= JSON_ARRAY_OPEN) {
 			var = json_variant_new(JSON_VARIANT_CONTROL);
-			var->value->integer = t;
+                        var->value.integer = t;
 		} else {
 			switch (t) {
 			case JSON_STRING:
