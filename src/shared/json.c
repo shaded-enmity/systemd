@@ -787,7 +787,7 @@ int json_parse(const char *string, json_variant **ret_variant) {
         json_variant *v;
 
 	assert(string);
-	assert(*ret_variant);
+        assert(*ret_variant == NULL);
 	assert(s);
 
 	if (0 > json_tokens(string, strlen(string), s))
