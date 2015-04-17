@@ -428,8 +428,8 @@ static int json_parse_number(const char **p, union json_value *ret) {
                 } while (strchr("0123456789", *c) && *c != 0);
         }
 
-        if (*c != 0)
-                return -EINVAL;
+        //if (*c != 0)
+        //        return -EINVAL;
 
         *p = c;
 
