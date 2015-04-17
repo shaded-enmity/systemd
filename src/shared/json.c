@@ -44,9 +44,10 @@ json_variant *json_variant_new(int type) {
 }
 
 static json_variant json_variant_deep_copy(json_variant *variant) {
+        json_variant v = {};
+
 	assert(variant);
 
-        json_variant v = {};
 	v.type = variant->type;
 	v.size = variant->size;
 
@@ -54,13 +55,13 @@ static json_variant json_variant_deep_copy(json_variant *variant) {
                 v.string = strndup(variant->string, variant->size);
 	else if (variant->type == JSON_VARIANT_ARRAY) {
 		v.obj = new0(json_variant, variant->size);
-                for (int i = 0; i < variant->size; ++i) {
+                for (unsigned i = 0; i < variant->size; ++i) {
 			v.obj[i] = json_variant_deep_copy(variant->obj[i]);
 		}
 	} 
 	else if (variant->type == JSON_VARIANT_OBJECT) {
 		v.obj = new0(json_variant, variant->size * 2);
-                for (int i = 0; i < variant->size * 2; ++i) {
+                for (unsigned i = 0; i < variant->size * 2; ++i) {
 			v.obj[i] = json_variant_deep_copy(variant->obj[i]);
 		}
 	} 
@@ -71,11 +72,11 @@ static json_variant json_variant_deep_copy(json_variant *variant) {
 }
 
 static json_variant json_variant_shallow_copy(json_variant *variant) {
+        json_variant v;
+
 	assert(variant);
 	assert(variant->type != JSON_VARIANT_ARRAY);
 	assert(variant->type != JSON_VARIANT_OBJECT);
-
-	json_variant v;
 
 	v.type = variant->type;
 	v.size = variant->size;
