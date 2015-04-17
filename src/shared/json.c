@@ -56,13 +56,13 @@ static json_variant json_variant_deep_copy(json_variant *variant) {
 	else if (variant->type == JSON_VARIANT_ARRAY) {
 		v.obj = new0(json_variant, variant->size);
                 for (unsigned i = 0; i < variant->size; ++i) {
-			v.obj[i] = json_variant_deep_copy(variant->obj[i]);
+                        v.obj[i] = json_variant_deep_copy(&variant->obj[i]);
 		}
 	} 
 	else if (variant->type == JSON_VARIANT_OBJECT) {
 		v.obj = new0(json_variant, variant->size * 2);
                 for (unsigned i = 0; i < variant->size * 2; ++i) {
-			v.obj[i] = json_variant_deep_copy(variant->obj[i]);
+                        v.obj[i] = json_variant_deep_copy(&variant->obj[i]);
 		}
 	} 
 	else
