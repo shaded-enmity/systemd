@@ -72,6 +72,14 @@ static void test_one(const char *data, ...) {
         va_end(ap);
 }
 
+static void test_file(const char *data) {
+        json_variant *v = NULL;
+        int t = json_parse(data, &v);
+
+        assert_se(t > 0);
+        assert_se(v != NULL);
+}
+
 int main(int argc, char *argv[]) {
 
         test_one("x", -EINVAL);
@@ -101,6 +109,10 @@ int main(int argc, char *argv[]) {
         test_one("\"\\ud800a\"", -EINVAL);
         test_one("\"\\udc00\\udc00\"", -EINVAL);
         test_one("\"\\ud801\\udc37\"", JSON_STRING, "\xf0\x90\x90\xb7", JSON_END);
+
+        test_one("[1, 2]", JSON_ARRAY_OPEN, JSON_INTEGER, 1, JSON_COMMA, JSON_INTEGER, 2, JSON_ARRAY_CLOSE, JSON_END);
+
+        test_file("{\"k\": \"v\", \"foo\": [1, 2, 3]}");
 
         return 0;
 }
