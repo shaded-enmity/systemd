@@ -776,7 +776,7 @@ static int json_tokens(const char *string, size_t size, Set* tokens) {
 			case JSON_STRING:
                                 var = json_variant_new(JSON_VARIANT_STRING);
                                 var->size = strlen(rstr);
-				var->string = rstr;
+                                var->string = strdup(rstr);
 				break;
 			case JSON_INTEGER:
 				var = json_variant_new(JSON_VARIANT_INTEGER);
