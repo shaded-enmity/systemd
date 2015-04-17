@@ -26,6 +26,7 @@
 #include "util.h"
 #include "utf8.h"
 #include "json.h"
+#include "set.h"
 
 enum {
         STATE_NULL,
@@ -67,7 +68,8 @@ static json_variant *json_object_unref(json_variant *variant) {
 }
 
 json_variant *json_variant_unref(json_variant *variant) {
-	assert(variant);
+	if (!variant)
+		return NULL;
 
 	if (variant->type == JSON_VARIANT_ARRAY)
 		return json_array_unref(variant);
@@ -542,36 +544,82 @@ int json_tokenize(
         }
 }
 
-static int json_parse_object(const char *p, void *json_state) {
+static bool json_is_value(json_variant *var) {
+	return var->type != JSON_VARIANT_CONTROL;
+}
 
-	assert(p);
-	assert(json_state);
+static int json_scoped_parse(Set *tokens, Iterator *i, json_variant *scope) {
+	void *e;
+	bool arr = scope->type == JSON_VARIANT_ARRAY;
+	int terminator = arr ? JSON_ARRAY_CLOSE : JSON_OBJECT_CLOSE;
+	enum {
+		STATE_KEY,
+		STATE_COLON,
+		STATE_COMMA,
+		STATE_VALUE
+	} state = arr ? STATE_VALUE : STATE_KEY;
+	json_variant *key, *value;
 
-	enum { 	STATE_KEY, 
-		STATE_VALUE, 
-		STATE_COMMA } state = STATE_KEY;
+	while((e = set_iterate(tokens, &it)) != NULL) {
+		json_variant *var = (json_variant *)e;
 
+		bool stopper = !json_is_value(var) && var->value->integer == terminator;
+		if (stopper) {
+			if (state != STATE_COMMA)
+				return -EBADMSG;
+			break;
+		}
+
+		if (state == STATE_KEY) { 
+			if (var->type != JSON_VARIANT_STRING) {
+				return -EBADMSG;
+			}
+			else {
+				key = var;
+				state = STATE_COLON;
+			}
+		} 
+		else if (state == STATE_COLON) {
+			if (key == NULL) 
+				return -EBADMSG;
+			state = STATE_VALUE;
+		}
+		else if (state == STATE_VALUE) {
+			if (!json_is_value(var)) 
+				json_scoped_parse(tokens, i);
+			else
+				value = var;
+			
+		}
+		else if (state == STATE_COMMA) {
+
+		}
+	}
+}
+
+int json_parse(Set *tokens, json_variant **ret_variant) {
+
+	assert(tokens);
+	assert(*ret_variant);
+
+	Iterator it = ITERATOR_FIRST;
+	void *e;
 	
+	while((e = set_iterate(tokens, &it)) != NULL) {
+		
+	}
 
 }
 
-static int json_parse_array(const char *p, void *json_state) {
-
-	assert(p);
-	assert(json_state);
-
-}
-
-int json_parse(const char *string, size_t size, json_variant *ret_variant) {
+static int json_tokens(const char *string, size_t size, Set* tokens) {
 	assert(string);
-	assert(ret_variant);
+	assert(tokens);
 
         _cleanup_free_ char *buf = NULL;
         union json_value v = {};
         void *json_state = NULL;
         const char *p;
         int t;
-	json_variant tlo;
        
         if (size <= 0)
                 return -EBADMSG;
@@ -591,10 +639,35 @@ int json_parse(const char *string, size_t size, json_variant *ret_variant) {
 		if (t < 0)
 			return t;
 
-		if (t != JSON_STRING)
-			return -EBADMSG;
+		if (t <= JSON_ARRAY_OPEN) {
+			var = json_variant_new(JSON_VARIANT_CONTROL, 1);
+			var->value->integer = t;
+		} else {
+			switch (t) {
+			case JSON_STRING:
+				var = json_variant_new(JSON_VARIANT_STRING, strlen(rstr));
+				var->string = rstr;
+				break;
+			case JSON_INTEGER:
+				var = json_variant_new(JSON_VARIANT_INTEGER, 1);
+				var->value = v;
+				break;
+			case JSON_REAL:
+				var = json_variant_new(JSON_VARIANT_REAL, 1);
+				var->value = v;
+				break;
+			case JSON_BOOLEAN:
+				var = json_variant_new(JSON_VARIANT_BOOLEAN, 1);
+				var->value = v;
+				break;
+			case JSON_NULL:
+				var = json_variant_new(JSON_VARIANT_NULL, 1);
+				break;
+			}
+		}
 
-
+		set_put(tokens, var);
 	}
 
+	return JSON_VARIANT_OBJECT;
 }
