@@ -745,6 +745,8 @@ static int json_tokens(const char *string, size_t size, Set* tokens) {
 		t = json_tokenize(&p, &rstr, &v, &json_state, NULL);
 		if (t < 0)
 			return t;
+                else if (t == JSON_END)
+                        break;
 
 		if (t <= JSON_ARRAY_OPEN) {
 			var = json_variant_new(JSON_VARIANT_CONTROL);
