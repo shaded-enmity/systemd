@@ -138,7 +138,7 @@ char *json_variant_string(json_variant *variant){
 
 bool json_variant_bool(json_variant *variant) {
 	assert(variant);
-	assert(variant->type == JSON_VARIANT_BOOL);
+        assert(variant->type == JSON_VARIANT_BOOLEAN);
 
 	return variant->value->boolean;
 }
