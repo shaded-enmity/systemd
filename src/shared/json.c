@@ -790,8 +790,12 @@ int json_parse(const char *string, json_variant **ret_variant) {
         assert(*ret_variant == NULL);
 	assert(s);
 
+        log_debug("Parsing string ...");
+
 	if (0 > json_tokens(string, strlen(string), s))
 		return -EBADMSG;
+
+        log_debug(" got %u tokens", set_size(s));
 
         v = json_variant_new(JSON_VARIANT_OBJECT);
         if (0 > json_parse_tokens(s, &v))
