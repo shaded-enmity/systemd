@@ -85,7 +85,7 @@ static void echo_variant(json_variant *v, unsigned i) {
                 log_info("%s", v->value.boolean ? "true" : "false");
                 break;
         case JSON_VARIANT_REAL:
-                log_info("%d", v->value.real);
+                log_info("%f", v->value.real);
                 break;
         case JSON_VARIANT_NULL:
                 log_info("null");
