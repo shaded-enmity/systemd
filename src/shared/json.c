@@ -865,7 +865,7 @@ int json_parse(const char *string, json_variant **ret_variant) {
         if (0 > json_parse_tokens(s, n, &v))
 		return -EBADMSG;
 
-        //json_variant_array_unref(s);
+        json_variant_array_unref(s);
 	*ret_variant = v;
 	return v->type;
 }
