@@ -824,7 +824,7 @@ int json_parse(const char *string, json_variant **ret_variant) {
 
         log_info("Parsing string ...");
 
-        if (0 > json_tokens(string, strlen(string), s, &n))
+        if (0 > json_tokens(string, strlen(string), &s, &n))
 		return -EBADMSG;
 
         log_info(" got %u tokens", n);
