@@ -85,6 +85,22 @@ static json_variant json_variant_shallow_copy(json_variant *variant) {
 }
 */
 
+static json_variant *json_variant_unref_inner(json_variant *variant) {
+        if (!variant)
+                return NULL;
+
+        if (variant->type == JSON_VARIANT_ARRAY)
+                return json_array_unref(varianr);
+
+        else if (variant->type == JSON_VARIANT_OBJECT)
+                return json_object_unref(variant);
+
+        else if (variant->type == JSON_VARIANT_STRING)
+                free(variant->string);
+
+        return NULL;
+}
+
 static json_variant *json_array_unref(json_variant *variant) {
 	assert(variant);
 	assert(variant->obj);
@@ -92,7 +108,7 @@ static json_variant *json_array_unref(json_variant *variant) {
         log_info("fishy ...");
 
         for (unsigned i = 0; i < variant->size; ++i) {
-                json_variant_unref(&variant->obj[i]);
+                json_variant_unref_inner(&variant->obj[i]);
 	}
 
         free(variant->obj);
@@ -106,10 +122,10 @@ static json_variant *json_object_unref(json_variant *variant) {
         log_info("here fishiy too");
 
         for (unsigned i = 0; i < variant->size * 2; ++i) {
-                json_variant_unref(variant->obj + i);
+                json_variant_unref_inner(&variant->obj[i]);
 	}
 
-	//free(variant);
+        free(variant->obj);
 	return NULL;
 }
 
@@ -132,7 +148,7 @@ json_variant *json_variant_unref(json_variant *variant) {
 		return NULL;
 
 	if (variant->type == JSON_VARIANT_ARRAY)
-		return json_array_unref(variant);
+                return json_array_unref(varianr);
 
 	else if (variant->type == JSON_VARIANT_OBJECT)
 		return json_object_unref(variant);
@@ -140,7 +156,8 @@ json_variant *json_variant_unref(json_variant *variant) {
 	else if (variant->type == JSON_VARIANT_STRING)
 		free(variant->string);
 
-	free(variant);
+        free(variant);
+
 	return NULL;
 }
 
