@@ -851,7 +851,7 @@ static int json_tokens(const char *string, size_t size, json_variant ***tokens, 
 
 int json_parse(const char *string, json_variant **ret_variant) {
 
-        json_variant **s = NULL;
+        _cleanup_jsonarrayunref_ json_variant **s = NULL;
         json_variant *v;
         size_t n = 0;
 
@@ -865,7 +865,6 @@ int json_parse(const char *string, json_variant **ret_variant) {
         if (0 > json_parse_tokens(s, n, &v))
 		return -EBADMSG;
 
-        json_variant_array_unref(s);
 	*ret_variant = v;
 	return v->type;
 }
