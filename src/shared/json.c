@@ -814,7 +814,7 @@ static int json_tokens(const char *string, size_t size, json_variant **tokens, s
 int json_parse(const char *string, json_variant **ret_variant) {
 
         //Set *s = set_new(NULL);
-        json_variant **s = NULL;
+        json_variant *s = NULL;
         json_variant *v;
         size_t n = 0;
 
@@ -823,15 +823,15 @@ int json_parse(const char *string, json_variant **ret_variant) {
 
         log_info("Parsing string ...");
 
-        if (0 > json_tokens(string, strlen(string), s, &n))
+        if (0 > json_tokens(string, strlen(string), &s, &n))
 		return -EBADMSG;
 
         log_info(" got %u tokens", n);
         for (size_t i = 0; i < n; ++i)
-                log_info("    tok %p ", s[i]);
+                log_info("    tok %p ", s+i);
 
         v = json_variant_new(JSON_VARIANT_OBJECT);
-        if (0 > json_parse_tokens(s, n, &v))
+        if (0 > json_parse_tokens(&s, n, &v))
 		return -EBADMSG;
 
 	*ret_variant = v;
