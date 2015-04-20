@@ -828,7 +828,7 @@ int json_parse(const char *string, json_variant **ret_variant) {
 
         log_info(" got %u tokens", n);
         for (size_t i = 0; i < n; ++i)
-                log_info("    tok %p ", s[i])
+                log_info("    tok %p ", s[i]);
 
         v = json_variant_new(JSON_VARIANT_OBJECT);
         if (0 > json_parse_tokens(s, n, &v))
