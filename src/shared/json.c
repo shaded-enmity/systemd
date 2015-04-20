@@ -630,8 +630,6 @@ static int json_scoped_parse(json_variant **tokens, size_t *i, size_t n, json_va
 	assert(i);
 	assert(scope);
 
-        log_info("i %i %u %"PRIu32, *i, *i, *i);
-
         while((e = *i < n ? tokens[(*i)++] : NULL) != NULL) {
                 json_variant *var = (json_variant *)e;
                 bool stopper = !json_is_value(var) && var->value.integer == terminator;
@@ -679,7 +677,7 @@ static int json_scoped_parse(json_variant **tokens, size_t *i, size_t n, json_va
                         size_t toadd = arr ? 1 : 2;
 
 			if (!json_is_value(var)) {
-				int type = (var->type == JSON_ARRAY_OPEN) ? JSON_VARIANT_ARRAY : JSON_VARIANT_OBJECT;
+                                int type = (var->value.integer == JSON_ARRAY_OPEN) ? JSON_VARIANT_ARRAY : JSON_VARIANT_OBJECT;
 
                                 v = json_variant_new(type);
 
