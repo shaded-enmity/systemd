@@ -748,7 +748,6 @@ static int json_tokens(const char *string, size_t size, json_variant **tokens, s
         size_t allocated = 0, s = 0;
 
         assert(string);
-        assert(tokens);
        
         if (size <= 0)
                 return -EBADMSG;
@@ -821,7 +820,6 @@ int json_parse(const char *string, json_variant **ret_variant) {
 
 	assert(string);
         assert(*ret_variant == NULL);
-	assert(s);
 
         log_info("Parsing string ...");
 
