@@ -136,7 +136,7 @@ json_variant **json_variant_array_unref(json_variant **variant) {
                 return NULL;
 
         while((p = (variant[i++])) != NULL) {
-                json_variant_unref(p);
+                free(p);
         }
 
         return NULL;
