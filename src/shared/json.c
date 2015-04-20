@@ -136,7 +136,7 @@ json_variant **json_variant_array_unref(json_variant **variant) {
                 return NULL;
 
         while((p = (variant[i++])) != NULL) {
-                log_info(" : %p", p);
+                //log_info(" : %p", p);
                 if (p->type == JSON_VARIANT_STRING)
                        free(p->string);
         }
