@@ -74,8 +74,6 @@ static void test_one(const char *data, ...) {
 
 static void echo_variant(json_variant *v, unsigned i) {
 
-        log_info(" - type: %i", v->type);
-
         switch(v->type) {
         case JSON_VARIANT_STRING:
                 log_info("\"%s\"", v->string);
