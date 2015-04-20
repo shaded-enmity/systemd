@@ -80,6 +80,8 @@ static void echo_variant(json_variant *v, unsigned i) {
         if (i)
                 prefix = strrep(" ", i);
 
+        log_info(" - type: %i", v->type);
+
         switch(v->type) {
         case JSON_VARIANT_STRING:
                 fmt = strcat(prefix, "\"%s\"");
