@@ -139,10 +139,16 @@ static void echo_variant(json_variant *v, unsigned i) {
                 log_info("{");
 
                 for (unsigned j = 0; j < v->size; j+=2) {
-                      echo_variant(json_variant_element(v, j), i+4);
-                      log_info("   ===>    ");
-                      echo_variant(json_variant_element(v, j+1), i+4);
-                      log_info(",");
+                      json_variant *key = json_variant_element(v, j);
+                      json_variant *val = json_variant_element(v, j+1);
+                      _cleanup_free_ char *x = value_string(key);
+                      printf("%s: ", x);
+                      if (val->type == JSON_VARIANT_ARRAY || val->type == JSON_VARIANT_OBJECT) {
+                             echo_variant(s, i);
+                      } else {
+                             _cleanup_free_ char *x = value_string(val);
+                             printf("%s, \n", x);
+                      }
                 }
 
                 log_info("}");
