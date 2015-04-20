@@ -72,8 +72,18 @@ static void test_one(const char *data, ...) {
         va_end(ap);
 }
 
+static char *value_string(json_variant *v) {
+        char *r = NULL;
+        switch (v->type) {
+        case JSON_VARIANT_STRING:
+                sprintf(r, "\"%s\"", v->string);
+        }
+        return r;
+}
+
 static void echo_variant(json_variant *v, unsigned i) {
 
+        printf(value_string(v));
         switch(v->type) {
         case JSON_VARIANT_STRING:
                 log_info("\"%s\"", v->string);
