@@ -814,7 +814,7 @@ static int json_tokens(const char *string, size_t size, json_variant ***tokens, 
 int json_parse(const char *string, json_variant **ret_variant) {
 
         //Set *s = set_new(NULL);
-        json_variant **s = NULL;
+        json_variant **s;
         json_variant *v;
         size_t n = 0;
 
