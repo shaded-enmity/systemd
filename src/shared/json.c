@@ -835,7 +835,9 @@ static int json_tokens(const char *string, size_t size, json_variant ***tokens, 
 
                 items[s++] = var;
 	}
-
+        if (!GREEDY_REALLOC(items, allocated, s+1))
+                return -ENOMEM;
+        items[s] = NULL;
         *n = s;
         *tokens = items;
 
