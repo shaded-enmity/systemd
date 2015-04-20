@@ -79,7 +79,7 @@ static void echo_variant(json_variant *v, unsigned i) {
                 log_info("\"%s\"", v->string);
                 break;
         case JSON_VARIANT_INTEGER:
-                log_info("%i", v->value.integer);
+                log_info("%"PRIi64, v->value.integer);
                 break;
         case JSON_VARIANT_BOOLEAN:
                 log_info("%s", v->value.boolean ? "true" : "false");
