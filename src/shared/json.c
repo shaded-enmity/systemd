@@ -109,6 +109,20 @@ static json_variant *json_object_unref(json_variant *variant) {
 	return NULL;
 }
 
+json_variant **json_variant_array_unref(json_variant **variant) {
+        size_t i = 0;
+        json_variant *p = NULL;
+
+        if (!variant)
+                return NULL;
+
+        while((p = (variant[i++])) != NULL) {
+                json_variant_unref(p);
+        }
+
+        return NULL;
+}
+
 json_variant *json_variant_unref(json_variant *variant) {
 	if (!variant)
 		return NULL;
@@ -688,6 +702,8 @@ static int json_scoped_parse(json_variant **tokens, size_t *i, size_t n, json_va
 			}
 
 			size += toadd;
+
+                        state = STATE_COMMA;
 		}
 		else if (state == STATE_COMMA) {
                         if (json_is_value(var)) {
