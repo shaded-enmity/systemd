@@ -110,7 +110,7 @@ static void echo_variant(json_variant *v, unsigned i) {
                       json_variant *s = json_variant_element(v, j);
                       if (s->type == JSON_VARIANT_ARRAY || s->type == JSON_VARIANT_OBJECT) {
                              if (p) {
-                                  log_info(p);
+                                  log_info("%s, ", p);
                                   free(p);
                                   p = NULL;
                              }
