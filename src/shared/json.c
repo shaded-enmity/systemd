@@ -89,6 +89,8 @@ static json_variant *json_array_unref(json_variant *variant) {
 	assert(variant);
 	assert(variant->obj);
 
+        log_info("fishy ...");
+
         for (unsigned i = 0; i < variant->size; ++i) {
                 json_variant_unref(variant->obj + i);
 	}
@@ -100,6 +102,8 @@ static json_variant *json_array_unref(json_variant *variant) {
 static json_variant *json_object_unref(json_variant *variant) {
 	assert(variant);
 	assert(variant->obj);
+
+        log_info("here fishiy too");
 
         for (unsigned i = 0; i < variant->size * 2; ++i) {
                 json_variant_unref(variant->obj + i);
