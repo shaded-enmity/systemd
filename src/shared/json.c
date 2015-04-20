@@ -693,7 +693,7 @@ static int json_scoped_parse(json_variant **tokens, size_t *i, size_t n, json_va
 			state = STATE_VALUE;
 		}
 		else if (state == STATE_VALUE) {
-                        _cleanup_(json_variant_unrefp) json_variant* v = NULL;
+                        _cleanup_jsonunref_ json_variant* v = NULL;
                         size_t toadd = arr ? 1 : 2;
 
 			if (!json_is_value(var)) {
@@ -775,7 +775,7 @@ static int json_tokens(const char *string, size_t size, json_variant ***tokens, 
         union json_value v = {};
         void *json_state = NULL;
         json_variant *var = NULL, **items = NULL;
-        //_cleanup_(json_variant_unrefp_array) json_variant **items = NULL;
+        _cleanup_jsonarrayunref_ json_variant **items = NULL;
         const char *p;
         int t;
         size_t allocated = 0, s = 0;
