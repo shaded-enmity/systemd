@@ -76,7 +76,8 @@ static char *value_string(json_variant *v) {
         char *r = NULL;
         switch (v->type) {
         case JSON_VARIANT_STRING:
-                sprintf(r, "\"%s\"", v->string);
+                if(0 > asprintf(&r, "\"%s\"", v->string))
+                      return NULL;
         }
         return r;
 }
