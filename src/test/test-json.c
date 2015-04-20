@@ -112,6 +112,7 @@ static void echo_variant(json_variant *v, unsigned i) {
                 log_info(efmt);
                 break;
         case JSON_VARIANT_OBJECT:
+                log_info("object");
                 fmt = strcat(prefix, "{");
                 efmt = strcat(prefix, "}");
                 log_info(fmt);
