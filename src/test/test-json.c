@@ -80,15 +80,15 @@ static char *value_string(json_variant *v) {
                       return NULL;
                 break;
         case JSON_VARIANT_INTEGER:
-                if(0 > asprintf(&r, "%"PRIi64, v->integer))
+                if(0 > asprintf(&r, "%"PRIi64, v->value.integer))
                       return NULL;
                 break;
         case JSON_VARIANT_REAL:
-                if(0 > asprintf(&r, "%f", v->real))
+                if(0 > asprintf(&r, "%f", v->value.real))
                       return NULL;
                 break;
         case JSON_VARIANT_BOOLEAN:
-                if(0 > asprintf(&r, "%s", v->boolean ? "true" : "false"))
+                if(0 > asprintf(&r, "%s", v->value.boolean ? "true" : "false"))
                       return NULL;
                 break;
         case JSON_VARIANT_NULL:
