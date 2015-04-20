@@ -194,7 +194,7 @@ json_variant *json_variant_element(json_variant *variant, unsigned index) {
 	assert(index < variant->size);
         assert(variant->obj);
 
-        return variant->obj + index;
+        return &variant->obj[index];
 }
 
 json_variant *json_variant_value(json_variant *variant, const char *key) {
