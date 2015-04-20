@@ -74,63 +74,45 @@ static void test_one(const char *data, ...) {
 
 static void echo_variant(json_variant *v, unsigned i) {
 
-        char *prefix = "";
-        _cleanup_free_ char * fmt = NULL;
-        _cleanup_free_ char * efmt = NULL;
-        if (i)
-                prefix = strrep(" ", i);
-
         log_info(" - type: %i", v->type);
 
         switch(v->type) {
         case JSON_VARIANT_STRING:
-                fmt = strcat(prefix, "\"%s\"");
-                log_info(fmt, v->string);
+                log_info("\"%s\"", v->string);
                 break;
         case JSON_VARIANT_INTEGER:
-                fmt = strcat(prefix, "%i");
-                log_info(fmt, v->value.integer);
+                log_info("%i", v->value.integer);
                 break;
         case JSON_VARIANT_BOOLEAN:
-                fmt = strcat(prefix, "%s");
-                log_info(fmt, v->value.boolean ? "true" : "false");
+                log_info("%s", v->value.boolean ? "true" : "false");
                 break;
         case JSON_VARIANT_REAL:
-                fmt = strcat(prefix, "%f");
-                log_info(fmt, v->value.real);
+                log_info("%d", v->value.real);
                 break;
         case JSON_VARIANT_ARRAY:
-                fmt = strcat(prefix, "[");
-                efmt = strcat(prefix, "]");
-
-                log_info(fmt);
+                log_info("[");
 
                 for (unsigned j = 0; j < v->size; ++j) {
                       echo_variant(json_variant_element(v, j), i+4);
+                      log_info(",");
                 }
 
-                log_info(efmt);
+                log_info("]");
                 break;
         case JSON_VARIANT_OBJECT:
-                log_info("object");
-                fmt = strcat(prefix, "{");
-                efmt = strcat(prefix, "}");
-                log_info(fmt);
+                log_info("{");
 
                 for (unsigned j = 0; j < v->size; j+=2) {
                       echo_variant(json_variant_element(v, j), i+4);
                       log_info("   ===>    ");
                       echo_variant(json_variant_element(v, j+1), i+4);
+                      log_info(",");
                 }
 
-                log_info(efmt);
+                log_info("}");
                 break;
         }
 
-
-
-        if (i)
-                free(prefix);
 }
 
 static void test_file(const char *data) {
