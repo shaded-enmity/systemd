@@ -118,7 +118,9 @@ static void echo_variant(json_variant *v, unsigned i) {
                       } else {
                              _cleanup_free_ char *x = value_string(s);
                              char *t;
-                             if (0 > asprintf(&t, "%s, %s", p, x))
+                             if (p && 0 > asprintf(&t, "%s, %s", p, x))
+                                   return;
+                             else if (!p && 0 > asprintf(&t. "%s", x))
                                    return;
                              free(p);
                              p = t;
