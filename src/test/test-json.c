@@ -161,7 +161,7 @@ int main(int argc, char *argv[]) {
         test_one("[1, 2]", JSON_ARRAY_OPEN, JSON_INTEGER, 1, JSON_COMMA, JSON_INTEGER, 2, JSON_ARRAY_CLOSE, JSON_END);
 
         test_file("{\"k\": \"v\", \"foo\": [1, 2, 3], \"bar\": {\"zap\": null}}");
-        test_file("{\"mutant\": [1, null, \"1\", {\"1\": [1. \"1\"]}], \"blah\": {}}");
+        test_file("{\"mutant\": [1, null, \"1\", {\"1\": [1. \"1\"]}], \"blah\": 0}");
 
         return 0;
 }
