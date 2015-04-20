@@ -80,24 +80,24 @@ static void echo_variant(json_variant *v, unsigned i) {
 
         switch(v->type) {
         case JSON_VARIANT_STRING:
-                _cleanup_free_ const char * fmt = strcat(prefix, "\"%s\"");
+                _cleanup_free_ char * fmt = strcat(prefix, "\"%s\"");
                 log_info(fmt, v->string);
                 break;
         case JSON_VARIANT_INTEGER:
-                _cleanup_free_ const char * fmt = strcat(prefix, "%i");
+                _cleanup_free_ char * fmt = strcat(prefix, "%i");
                 log_info(fmt, v->value.integer);
                 break;
         case JSON_VARIANT_BOOLEAN:
-                _cleanup_free_ const char * fmt = strcat(prefix, "%s");
+                _cleanup_free_ char * fmt = strcat(prefix, "%s");
                 log_info(fmt, v->value.boolean ? "true" : "false");
                 break;
         case JSON_VARIANT_REAL:
-                _cleanup_free_ const char * fmt = strcat(prefix, "%f");
+                _cleanup_free_ char * fmt = strcat(prefix, "%f");
                 log_info(fmt, v->value.real);
                 break;
         case JSON_VARIANT_ARRAY:
-                _cleanup_free_ const char * fmt = strcat(prefix, "[");
-                _cleanup_free_ const char * efmt = strcat(prefix, "]");
+                _cleanup_free_ char * fmt = strcat(prefix, "[");
+                _cleanup_free_ char * efmt = strcat(prefix, "]");
                 log_info(fmt);
 
                 for (unsigned j = 0; j < v->size; ++j) {
@@ -107,8 +107,8 @@ static void echo_variant(json_variant *v, unsigned i) {
                 log_info(efmt);
                 break;
         case JSON_VARIANT_OBJECT:
-                _cleanup_free_ const char * fmt = strcat(prefix, "{");
-                _cleanup_free_ const char * efmt = strcat(prefix, "}");
+                _cleanup_free_ char * fmt = strcat(prefix, "{");
+                _cleanup_free_ char * efmt = strcat(prefix, "}");
                 log_info(fmt);
 
                 for (unsigned j = 0; j < v->size; j+=2) {
