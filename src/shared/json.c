@@ -190,7 +190,7 @@ double json_variant_real(json_variant *variant) {
 
 json_variant *json_variant_element(json_variant *variant, unsigned index) {
 	assert(variant);
-	assert(variant->type == JSON_VARIANT_ARRAY);
+        assert(variant->type == JSON_VARIANT_ARRAY || variant->type == JSON_VARIANT_OBJECT);
 	assert(index < variant->size);
         assert(variant->obj);
 
