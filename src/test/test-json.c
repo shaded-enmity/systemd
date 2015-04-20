@@ -101,29 +101,34 @@ static char *value_string(json_variant *v) {
 
 static void echo_variant(json_variant *v, unsigned i) {
 
-        printf("P: %s\n", value_string(v));
         switch(v->type) {
-        case JSON_VARIANT_STRING:
-                log_info("\"%s\"", v->string);
-                break;
-        case JSON_VARIANT_INTEGER:
-                log_info("%"PRIi64, v->value.integer);
-                break;
-        case JSON_VARIANT_BOOLEAN:
-                log_info("%s", v->value.boolean ? "true" : "false");
-                break;
-        case JSON_VARIANT_REAL:
-                log_info("%f", v->value.real);
-                break;
-        case JSON_VARIANT_NULL:
-                log_info("null");
-                break;
-        case JSON_VARIANT_ARRAY:
+       case JSON_VARIANT_ARRAY:
                 log_info("[");
+                char *p = NULL;
 
                 for (unsigned j = 0; j < v->size; ++j) {
-                      echo_variant(json_variant_element(v, j), i+4);
-                      log_info(",");
+                      json_variant *s = json_variant_element(v, j);
+                      if (s->type == JSON_VARIANT_ARRAY || s->type == JSON_VARIANT_OBJECT) {
+                             if (p) {
+                                  log_info(p);
+                                  free(p);
+                                  p = NULL;
+                             }
+                             echo_variant(v, i);
+                      } else {
+                             _cleanup_free_ char *x = value_string(s);
+                             char *t;
+                             if (0 > asprintf(&t, "%s, %s", p, x))
+                                   return;
+                             free(p);
+                             p = t;
+                      }
+                }
+
+                if (p) {
+                     log_info(p);
+                     free(p);
+                     p = NULL;
                 }
 
                 log_info("]");
