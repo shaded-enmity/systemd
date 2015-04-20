@@ -774,8 +774,7 @@ static int json_tokens(const char *string, size_t size, json_variant ***tokens, 
         _cleanup_free_ char *buf = NULL;
         union json_value v = {};
         void *json_state = NULL;
-        json_variant *var = NULL;//, **items = NULL;
-        _cleanup_jsonarrayunref_ json_variant **items = NULL;
+        json_variant *var = NULL, **items = NULL;
         const char *p;
         int t;
         size_t allocated = 0, s = 0;
@@ -846,7 +845,7 @@ static int json_tokens(const char *string, size_t size, json_variant ***tokens, 
 
 int json_parse(const char *string, json_variant **ret_variant) {
 
-        json_variant **s = NULL;
+        _cleanup_jsonarrayunref_ json_variant **s = NULL;
         json_variant *v;
         size_t n = 0;
 
