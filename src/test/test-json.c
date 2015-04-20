@@ -146,6 +146,7 @@ static void echo_variant(json_variant *v, unsigned i) {
                       if (val->type == JSON_VARIANT_ARRAY || val->type == JSON_VARIANT_OBJECT) {
                              printf("\n");
                              echo_variant(val, i);
+                             printf(",\n");
                       } else {
                              _cleanup_free_ char *x = value_string(val);
                              printf("%s, \n", x);
