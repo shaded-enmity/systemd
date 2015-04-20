@@ -67,7 +67,11 @@ typedef struct json_variant {
 
 json_variant *json_variant_new(int json_type);
 json_variant *json_variant_unref(json_variant *);
+json_variant **json_variant_array_unref(json_variant **variant);
 DEFINE_TRIVIAL_CLEANUP_FUNC(json_variant *, json_variant_unref);
+DEFINE_TRIVIAL_CLEANUP_FUNC(json_variant **, json_variant_array_unref);
+#define _cleanup_jsonunref_ _cleanup_(json_variant_unrefp)
+#define _cleanup_jsonarrayunref_ _cleanup_(json_variant_array_unrefp)
 
 char *json_variant_string(json_variant *);
 bool json_variant_bool(json_variant *);
@@ -80,4 +84,4 @@ json_variant *json_variant_value(json_variant *, const char *key);
 #define JSON_VALUE_NULL ((union json_value) {})
 
 int json_tokenize(const char **p, char **ret_string, union json_value *ret_value, void **state, unsigned *line);
-int json_parse(const char *string, json_variant **ret_variant);
+int json_parse(const char *string, json_variant **rv);

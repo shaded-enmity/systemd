@@ -72,12 +72,103 @@ static void test_one(const char *data, ...) {
         va_end(ap);
 }
 
+static char *value_string(json_variant *v) {
+        char *r = NULL;
+        switch (v->type) {
+        case JSON_VARIANT_STRING:
+                if(0 > asprintf(&r, "\"%s\"", v->string))
+                      return NULL;
+                break;
+        case JSON_VARIANT_INTEGER:
+                if(0 > asprintf(&r, "%"PRIi64, v->value.integer))
+                      return NULL;
+                break;
+        case JSON_VARIANT_REAL:
+                if(0 > asprintf(&r, "%f", v->value.real))
+                      return NULL;
+                break;
+        case JSON_VARIANT_BOOLEAN:
+                if(0 > asprintf(&r, "%s", v->value.boolean ? "true" : "false"))
+                      return NULL;
+                break;
+        case JSON_VARIANT_NULL:
+                if(0 > asprintf(&r, "null"))
+                      return NULL;
+                break;
+        }
+        return r;
+}
+
+static void echo_variant(json_variant *v, unsigned i) {
+
+        switch(v->type) {
+       case JSON_VARIANT_ARRAY:
+                log_info("[");
+                char *p = NULL;
+
+                for (unsigned j = 0; j < v->size; ++j) {
+                      json_variant *s = json_variant_element(v, j);
+                      if (s->type == JSON_VARIANT_ARRAY || s->type == JSON_VARIANT_OBJECT) {
+                             if (p) {
+                                  log_info("%s, ", p);
+                                  free(p);
+                                  p = NULL;
+                             }
+                             echo_variant(s, i);
+                      } else {
+                             _cleanup_free_ char *x = value_string(s);
+                             char *t;
+                             if (p && 0 > asprintf(&t, "%s, %s", p, x))
+                                   return;
+                             else if (!p && 0 > asprintf(&t, "%s", x))
+                                   return;
+                             free(p);
+                             p = t;
+                      }
+                }
+
+                if (p) {
+                     log_info(p);
+                     free(p);
+                     p = NULL;
+                }
+
+                log_info("]");
+                break;
+        case JSON_VARIANT_OBJECT:
+                log_info("{");
+
+                for (unsigned j = 0; j < v->size; j+=2) {
+                      json_variant *key = json_variant_element(v, j);
+                      json_variant *val = json_variant_element(v, j+1);
+                      _cleanup_free_ char *x = value_string(key);
+                      printf("%s: ", x);
+                      if (val->type == JSON_VARIANT_ARRAY || val->type == JSON_VARIANT_OBJECT) {
+                             printf("\n");
+                             echo_variant(val, i);
+                             printf(",\n");
+                      } else {
+                             _cleanup_free_ char *x = value_string(val);
+                             printf("%s, \n", x);
+                      }
+                }
+
+                log_info("}");
+                break;
+        }
+
+}
+
 static void test_file(const char *data) {
         json_variant *v = NULL;
         int t = json_parse(data, &v);
 
         assert_se(t > 0);
         assert_se(v != NULL);
+        assert_se(v->type == JSON_VARIANT_OBJECT);
+        echo_variant(v, 0);
+
+        json_variant_unref(v);
 }
 
 int main(int argc, char *argv[]) {
@@ -112,7 +203,8 @@ int main(int argc, char *argv[]) {
 
         test_one("[1, 2]", JSON_ARRAY_OPEN, JSON_INTEGER, 1, JSON_COMMA, JSON_INTEGER, 2, JSON_ARRAY_CLOSE, JSON_END);
 
-        test_file("{\"k\": \"v\", \"foo\": [1, 2, 3]}");
+        test_file("{\"k\": \"v\", \"foo\": [1, 2, 3], \"bar\": {\"zap\": null}}");
+        test_file("{\"mutant\": [1, null, \"1\", {\"1\": [1, \"1\"]}], \"blah\": 1.27}");
 
         return 0;
 }
