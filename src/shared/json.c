@@ -616,7 +616,7 @@ static int json_scoped_parse(json_variant **tokens, size_t *i, size_t n, json_va
 	assert(i);
 	assert(scope);
 
-        while((*i < n ? tokens[*i++] : NULL) != NULL) {
+        while((e = *i < n ? tokens[*i++] : NULL) != NULL) {
                 json_variant *var = (json_variant *)e;
                 bool stopper = !json_is_value(var) && var->value.integer == terminator;
 
@@ -798,7 +798,7 @@ static int json_tokens(const char *string, size_t size, json_variant **tokens, s
 			}
 		}
 
-                if (!GREEDY_REALLOC(*tokens, allocated, s+1))
+                if (!GREEDY_REALLOC(tokens, allocated, s+1))
                         return -ENOMEM;
 
                 tokens[s++] = var;
