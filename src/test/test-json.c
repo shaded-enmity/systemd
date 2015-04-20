@@ -78,13 +78,30 @@ static char *value_string(json_variant *v) {
         case JSON_VARIANT_STRING:
                 if(0 > asprintf(&r, "\"%s\"", v->string))
                       return NULL;
+                break;
+        case JSON_VARIANT_INTEGER:
+                if(0 > asprintf(&r, "%"PRIi64, v->integer))
+                      return NULL;
+                break;
+        case JSON_VARIANT_REAL:
+                if(0 > asprintf(&r, "%f", v->real))
+                      return NULL;
+                break;
+        case JSON_VARIANT_BOOLEAN:
+                if(0 > asprintf(&r, "%s", v->boolean ? "true" : "false"))
+                      return NULL;
+                break;
+        case JSON_VARIANT_NULL:
+                if(0 > asprintf(&r, "null")
+                      return NULL;
+                break;
         }
         return r;
 }
 
 static void echo_variant(json_variant *v, unsigned i) {
 
-        printf("P: %s", value_string(v));
+        printf("P: %s\n", value_string(v));
         switch(v->type) {
         case JSON_VARIANT_STRING:
                 log_info("\"%s\"", v->string);
