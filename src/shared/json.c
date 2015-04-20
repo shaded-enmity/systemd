@@ -789,7 +789,7 @@ static int json_tokens(const char *string, size_t size, json_variant ***tokens, 
                 else if (t == JSON_END)
                         break;
 
-		if (t <= JSON_ARRAY_OPEN) {
+                if (t <= JSON_ARRAY_CLOSE) {
 			var = json_variant_new(JSON_VARIANT_CONTROL);
                         var->value.integer = t;
 		} else {
