@@ -121,6 +121,8 @@ static void test_file(const char *data) {
         assert_se(v != NULL);
 
         echo_variant(v, 0);
+
+        json_variant_unref(v);
 }
 
 int main(int argc, char *argv[]) {
