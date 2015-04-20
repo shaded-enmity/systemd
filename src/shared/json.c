@@ -634,7 +634,7 @@ static int json_scoped_parse(json_variant **tokens, size_t *i, size_t n, json_va
                 json_variant *var = (json_variant *)e;
                 bool stopper = !json_is_value(var) && var->value.integer == terminator;
 
-                log_info("var: %i", var->type);
+                log_info("var: %i [i=%u]", var->type, *i);
 
 		if (stopper) {
                         if (state != STATE_COMMA) {
