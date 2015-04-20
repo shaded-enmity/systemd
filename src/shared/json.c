@@ -737,12 +737,12 @@ static int json_parse_tokens(json_variant **tokens, size_t ntokens, json_variant
         return (*ret_variant)->type;
 }
 
-static int json_tokens(const char *string, size_t size, json_variant **tokens, size_t *n) {
+static int json_tokens(const char *string, size_t size, json_variant ***tokens, size_t *n) {
 
         _cleanup_free_ char *buf = NULL;
         union json_value v = {};
         void *json_state = NULL;
-        json_variant *var;
+        json_variant *var, **items;
         const char *p;
         int t;
         size_t allocated = 0, s = 0;
@@ -798,14 +798,15 @@ static int json_tokens(const char *string, size_t size, json_variant **tokens, s
 			}
 		}
 
-                if (!GREEDY_REALLOC(tokens, allocated, s+1))
+                if (!GREEDY_REALLOC(items, allocated, s+1))
                         return -ENOMEM;
 
-                tokens[s++] = var;
+                items[s++] = var;
                 //set_put(tokens, var);
 	}
 
         *n = s;
+        *tokens = items;
 
 	return JSON_VARIANT_OBJECT;
 }
@@ -814,7 +815,7 @@ static int json_tokens(const char *string, size_t size, json_variant **tokens, s
 int json_parse(const char *string, json_variant **ret_variant) {
 
         //Set *s = set_new(NULL);
-        json_variant **s;
+        json_variant **s = NULL;
         json_variant *v;
         size_t n = 0;
 
@@ -823,7 +824,7 @@ int json_parse(const char *string, json_variant **ret_variant) {
 
         log_info("Parsing string ...");
 
-        if (0 > json_tokens(string, strlen(string), s, &n))
+        if (0 > json_tokens(string, strlen(string), &s, &n))
 		return -EBADMSG;
 
         log_info(" got %u tokens", n);
