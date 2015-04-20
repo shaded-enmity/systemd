@@ -774,7 +774,7 @@ static int json_tokens(const char *string, size_t size, json_variant ***tokens, 
         _cleanup_free_ char *buf = NULL;
         union json_value v = {};
         void *json_state = NULL;
-        json_variant *var = NULL, **items = NULL;
+        json_variant *var = NULL;//, **items = NULL;
         _cleanup_jsonarrayunref_ json_variant **items = NULL;
         const char *p;
         int t;
