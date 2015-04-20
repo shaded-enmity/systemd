@@ -85,12 +85,15 @@ static json_variant json_variant_shallow_copy(json_variant *variant) {
 }
 */
 
+static json_variant *json_array_unref(json_variant *variant);
+static json_variant *json_object_unref(json_variant *variant);
+
 static json_variant *json_variant_unref_inner(json_variant *variant) {
         if (!variant)
                 return NULL;
 
         if (variant->type == JSON_VARIANT_ARRAY)
-                return json_array_unref(varianr);
+                return json_array_unref(variant);
 
         else if (variant->type == JSON_VARIANT_OBJECT)
                 return json_object_unref(variant);
