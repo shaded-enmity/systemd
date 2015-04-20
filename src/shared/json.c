@@ -92,10 +92,10 @@ static json_variant *json_array_unref(json_variant *variant) {
         log_info("fishy ...");
 
         for (unsigned i = 0; i < variant->size; ++i) {
-                json_variant_unref(variant->obj + i);
+                json_variant_unref(&variant->obj[i]);
 	}
 
-	//free(variant);
+        free(variant->obj);
 	return NULL;
 }
 
