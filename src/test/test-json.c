@@ -114,7 +114,7 @@ static void echo_variant(json_variant *v, unsigned i) {
                                   free(p);
                                   p = NULL;
                              }
-                             echo_variant(v, i);
+                             echo_variant(s, i);
                       } else {
                              _cleanup_free_ char *x = value_string(s);
                              char *t;
