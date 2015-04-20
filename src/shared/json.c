@@ -599,7 +599,7 @@ static bool json_is_value(json_variant *var) {
 	return var->type != JSON_VARIANT_CONTROL;
 }
 
-static int json_scoped_parse(Set *tokens, Iterator *i, json_variant *scope) {
+static int json_scoped_parse(json_variant **tokens, size_t *i, size_t n, json_variant *scope) {
         void *e = NULL;
         bool arr = scope->type == JSON_VARIANT_ARRAY;
         int terminator = arr ? JSON_ARRAY_CLOSE : JSON_OBJECT_CLOSE;
@@ -616,7 +616,7 @@ static int json_scoped_parse(Set *tokens, Iterator *i, json_variant *scope) {
 	assert(i);
 	assert(scope);
 
-        while((e = set_iterate(tokens, i)) != NULL) {
+        while((*i < n ? tokens[*i++] : NULL) != NULL) {
                 json_variant *var = (json_variant *)e;
                 bool stopper = !json_is_value(var) && var->value.integer == terminator;
 
@@ -659,20 +659,20 @@ static int json_scoped_parse(Set *tokens, Iterator *i, json_variant *scope) {
 			state = STATE_VALUE;
 		}
 		else if (state == STATE_VALUE) {
-			_cleanup_(json_variant_unrefp) json_variant* n = NULL;
+                        _cleanup_(json_variant_unrefp) json_variant* v = NULL;
                         size_t toadd = arr ? 1 : 2;
 
 			if (!json_is_value(var)) {
 				int type = (var->type == JSON_ARRAY_OPEN) ? JSON_VARIANT_ARRAY : JSON_VARIANT_OBJECT;
 
-                                n = json_variant_new(type);
+                                v = json_variant_new(type);
 
-				if (0 > json_scoped_parse(tokens, i, n)) {
+                                if (0 > json_scoped_parse(tokens, i, n, v)) {
                                         log_info("error parsing sub-scope");
 					return -EBADMSG;
 				}
 
-				value = n;
+                                value = v;
 			} 
 			else
 				value = var;
@@ -713,15 +713,17 @@ static int json_scoped_parse(Set *tokens, Iterator *i, json_variant *scope) {
 	return scope->type;
 }
 
-static int json_parse_tokens(Set *tokens, json_variant **ret_variant) {
+static int json_parse_tokens(json_variant **tokens, size_t ntokens, json_variant **ret_variant) {
 
-        Iterator it = ITERATOR_FIRST;
+        //Iterator it = ITERATOR_FIRST;
+        size_t it = 0;
         json_variant *e;
 
 	assert(tokens);
 	assert(*ret_variant);
+        assert(ntokens);
 
-        e = (json_variant *)set_iterate(tokens, &it);
+        e = tokens[it];
         *ret_variant = json_variant_new(JSON_VARIANT_OBJECT);
 
         if (e->type != JSON_VARIANT_CONTROL && e->value.integer != JSON_OBJECT_OPEN)
@@ -729,13 +731,13 @@ static int json_parse_tokens(Set *tokens, json_variant **ret_variant) {
 
         log_info("parsing scope");
 
-	if (0 > json_scoped_parse(tokens, &it, *ret_variant))
+        if (0 > json_scoped_parse(tokens, &it, ntokens, *ret_variant))
 		return -EBADMSG;
 
         return (*ret_variant)->type;
 }
 
-static int json_tokens(const char *string, size_t size, Set* tokens) {
+static int json_tokens(const char *string, size_t size, json_variant **tokens, size_t *n) {
 
         _cleanup_free_ char *buf = NULL;
         union json_value v = {};
@@ -743,6 +745,7 @@ static int json_tokens(const char *string, size_t size, Set* tokens) {
         json_variant *var;
         const char *p;
         int t;
+        size_t allocated = 0, s = 0;
 
         assert(string);
         assert(tokens);
@@ -796,8 +799,14 @@ static int json_tokens(const char *string, size_t size, Set* tokens) {
 			}
 		}
 
-		set_put(tokens, var);
+                if (!GREEDY_REALLOC(tokens, allocated, s+1))
+                        return -ENOMEM;
+
+                tokens[s++] = var;
+                //set_put(tokens, var);
 	}
+
+        *n = s;
 
 	return JSON_VARIANT_OBJECT;
 }
@@ -805,8 +814,10 @@ static int json_tokens(const char *string, size_t size, Set* tokens) {
 
 int json_parse(const char *string, json_variant **ret_variant) {
 
-        Set *s = set_new(NULL);
+        //Set *s = set_new(NULL);
+        json_variant **s = NULL;
         json_variant *v;
+        size_t n = 0;
 
 	assert(string);
         assert(*ret_variant == NULL);
@@ -814,13 +825,13 @@ int json_parse(const char *string, json_variant **ret_variant) {
 
         log_info("Parsing string ...");
 
-	if (0 > json_tokens(string, strlen(string), s))
+        if (0 > json_tokens(string, strlen(string), s, &n))
 		return -EBADMSG;
 
         log_info(" got %u tokens", set_size(s));
 
         v = json_variant_new(JSON_VARIANT_OBJECT);
-        if (0 > json_parse_tokens(s, &v))
+        if (0 > json_parse_tokens(s, n, &v))
 		return -EBADMSG;
 
 	*ret_variant = v;
