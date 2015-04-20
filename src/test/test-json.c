@@ -120,7 +120,7 @@ static void echo_variant(json_variant *v, unsigned i) {
                              char *t;
                              if (p && 0 > asprintf(&t, "%s, %s", p, x))
                                    return;
-                             else if (!p && 0 > asprintf(&t. "%s", x))
+                             else if (!p && 0 > asprintf(&t, "%s", x))
                                    return;
                              free(p);
                              p = t;
