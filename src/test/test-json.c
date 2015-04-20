@@ -122,8 +122,8 @@ static void test_file(const char *data) {
 
         assert_se(t > 0);
         assert_se(v != NULL);
-
-        echo_variant(v, 0);
+        assert_se(v->type == JSON_VARIANT_OBJECT);
+        //echo_variant(v, 0);
 
         json_variant_unref(v);
 }
