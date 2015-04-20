@@ -641,6 +641,8 @@ static int json_scoped_parse(json_variant **tokens, size_t *i, size_t n, json_va
                                 log_info("Unexpected stopper");
 				return -EBADMSG;
                         }
+
+                        break;
 		}
 
 		if (state == STATE_KEY) { 
