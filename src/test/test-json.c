@@ -157,7 +157,7 @@ int main(int argc, char *argv[]) {
 
         test_one("[1, 2]", JSON_ARRAY_OPEN, JSON_INTEGER, 1, JSON_COMMA, JSON_INTEGER, 2, JSON_ARRAY_CLOSE, JSON_END);
 
-        test_file("{\"k\": \"v\", \"foo\": [1, 2, 3]}");
+        test_file("{\"k\": \"v\", \"foo\": [1, 2, 3], \"bar\": {\"zap\": 1}}");
 
         return 0;
 }
