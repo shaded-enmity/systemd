@@ -653,7 +653,7 @@ static int json_scoped_parse(json_variant **tokens, size_t *i, size_t n, json_va
 	assert(i);
 	assert(scope);
 
-        while((e = *i <= n ? tokens[(*i)++] : NULL) != NULL) {
+        while((e = *i < n ? tokens[(*i)++] : NULL) != NULL) {
                 json_variant *var = (json_variant *)e;
                 bool stopper = !json_is_value(var) && var->value.integer == terminator;
 
@@ -864,7 +864,7 @@ int json_parse(const char *string, json_variant **ret_variant) {
         if (0 > json_parse_tokens(s, n, &v))
 		return -EBADMSG;
 
-        json_variant_array_unref(s);
+        //json_variant_array_unref(s);
 	*ret_variant = v;
 	return v->type;
 }
