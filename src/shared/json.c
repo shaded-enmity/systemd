@@ -148,7 +148,7 @@ json_variant *json_variant_unref(json_variant *variant) {
 		return NULL;
 
 	if (variant->type == JSON_VARIANT_ARRAY)
-                return json_array_unref(varianr);
+                return json_array_unref(variant);
 
 	else if (variant->type == JSON_VARIANT_OBJECT)
 		return json_object_unref(variant);
