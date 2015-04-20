@@ -92,7 +92,7 @@ static char *value_string(json_variant *v) {
                       return NULL;
                 break;
         case JSON_VARIANT_NULL:
-                if(0 > asprintf(&r, "null")
+                if(0 > asprintf(&r, "null"))
                       return NULL;
                 break;
         }
