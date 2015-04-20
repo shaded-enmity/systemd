@@ -84,7 +84,7 @@ static char *value_string(json_variant *v) {
 
 static void echo_variant(json_variant *v, unsigned i) {
 
-        printf(value_string(v));
+        printf("P: %s", value_string(v));
         switch(v->type) {
         case JSON_VARIANT_STRING:
                 log_info("\"%s\"", v->string);
