@@ -723,7 +723,7 @@ static int json_parse_tokens(json_variant **tokens, size_t ntokens, json_variant
 	assert(*ret_variant);
         assert(ntokens);
 
-        e = tokens[it];
+        e = tokens[it++];
         *ret_variant = json_variant_new(JSON_VARIANT_OBJECT);
 
         if (e->type != JSON_VARIANT_CONTROL && e->value.integer != JSON_OBJECT_OPEN)
@@ -737,12 +737,13 @@ static int json_parse_tokens(json_variant **tokens, size_t ntokens, json_variant
         return (*ret_variant)->type;
 }
 
-static int json_tokens(const char *string, size_t size, json_variant **tokens, size_t *n) {
+static int json_tokens(const char *string, size_t size, json_variant ***tokens, size_t *n) {
 
         _cleanup_free_ char *buf = NULL;
         union json_value v = {};
         void *json_state = NULL;
         json_variant *var = NULL, **items = NULL;
+        //_cleanup_(json_variant_unrefp_array) json_variant **items = NULL;
         const char *p;
         int t;
         size_t allocated = 0, s = 0;
@@ -827,9 +828,9 @@ int json_parse(const char *string, json_variant **ret_variant) {
         if (0 > json_tokens(string, strlen(string), &s, &n))
 		return -EBADMSG;
 
-        log_info(" got %u tokens", n);
-        for (size_t i = 0; i < n; ++i)
-                log_info("    tok %p ", s[i]);
+        //log_info(" got %u tokens", n);
+        //for (size_t i = 0; i < n; ++i)
+        //        log_info("    tok %p ", s[i]);
 
         v = json_variant_new(JSON_VARIANT_OBJECT);
         if (0 > json_parse_tokens(s, n, &v))
