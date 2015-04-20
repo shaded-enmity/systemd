@@ -754,24 +754,24 @@ static int json_scoped_parse(json_variant **tokens, size_t *i, size_t n, json_va
 	return scope->type;
 }
 
-static int json_parse_tokens(json_variant **tokens, size_t ntokens, json_variant **ret_variant) {
+static int json_parse_tokens(json_variant **tokens, size_t ntokens, json_variant **rv) {
 
         size_t it = 0;
         json_variant *e;
 
-	assert(*ret_variant);
+        assert(*rv);
         assert(ntokens);
 
         e = tokens[it++];
-        *ret_variant = json_variant_new(JSON_VARIANT_OBJECT);
+        *rv = json_variant_new(JSON_VARIANT_OBJECT);
 
         if (e->type != JSON_VARIANT_CONTROL && e->value.integer != JSON_OBJECT_OPEN)
 		return -EBADMSG;
 
-        if (0 > json_scoped_parse(tokens, &it, ntokens, *ret_variant))
+        if (0 > json_scoped_parse(tokens, &it, ntokens, *rv))
 		return -EBADMSG;
 
-        return (*ret_variant)->type;
+        return (*rv)->type;
 }
 
 static int json_tokens(const char *string, size_t size, json_variant ***tokens, size_t *n) {
@@ -850,14 +850,14 @@ static int json_tokens(const char *string, size_t size, json_variant ***tokens, 
 }
 
 
-int json_parse(const char *string, json_variant **ret_variant) {
+int json_parse(const char *string, json_variant **rv) {
 
         _cleanup_jsonarrayunref_ json_variant **s = NULL;
         json_variant *v;
         size_t n = 0;
 
 	assert(string);
-        assert(*ret_variant == NULL);
+        assert(*rv == NULL);
 
         if (0 > json_tokens(string, strlen(string), &s, &n))
 		return -EBADMSG;
@@ -866,6 +866,6 @@ int json_parse(const char *string, json_variant **ret_variant) {
         if (0 > json_parse_tokens(s, n, &v))
 		return -EBADMSG;
 
-	*ret_variant = v;
+        *rv = v;
 	return v->type;
 }

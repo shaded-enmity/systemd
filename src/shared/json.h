@@ -84,4 +84,4 @@ json_variant *json_variant_value(json_variant *, const char *key);
 #define JSON_VALUE_NULL ((union json_value) {})
 
 int json_tokenize(const char **p, char **ret_string, union json_value *ret_value, void **state, unsigned *line);
-int json_parse(const char *string, json_variant **ret_variant);
+int json_parse(const char *string, json_variant **rv);
