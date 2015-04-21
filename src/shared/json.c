@@ -739,6 +739,7 @@ static int json_parse_tokens(json_variant **tokens, size_t ntokens, json_variant
         size_t it = 0;
         json_variant *e;
 
+        assert(tokens);
         assert(*rv == NULL);
         assert(ntokens);
 
@@ -759,7 +760,7 @@ static int json_tokens(const char *string, size_t size, json_variant ***tokens, 
         _cleanup_free_ char *buf = NULL;
         union json_value v = {};
         void *json_state = NULL;
-        json_variant **items = NULL;
+        _cleanup_jsonarrayunref_ json_variant **items = NULL;
         const char *p;
         int t;
         size_t allocated = 0, s = 0;
@@ -824,11 +825,10 @@ static int json_tokens(const char *string, size_t size, json_variant ***tokens, 
                 items[s] = NULL;
                 var = NULL;
 	}
-        /*if (!GREEDY_REALLOC(items, allocated, s+1))
-                return -ENOMEM;
-        items[s] = NULL;*/
+
         *n = s;
         *tokens = items;
+        items = NULL;
 
 	return JSON_VARIANT_OBJECT;
 }
