@@ -739,7 +739,7 @@ static int json_parse_tokens(json_variant **tokens, size_t ntokens, json_variant
         size_t it = 0;
         json_variant *e;
 
-        assert(*rv);
+        assert(*rv == NULL);
         assert(ntokens);
 
         e = tokens[it++];
