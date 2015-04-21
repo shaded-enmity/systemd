@@ -85,7 +85,7 @@ static json_variant *json_raw_unref(json_variant *variant, size_t size) {
         assert(variant);
 
         for (size_t i = 0; i < size; ++i) {
-                json_variant_unref_inner(&variant[i]));
+                json_variant_unref_inner(&variant[i]);
 	}
 
         free(variant);
