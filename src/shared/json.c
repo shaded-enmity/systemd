@@ -23,7 +23,6 @@
 #include <math.h>
 
 #include "macro.h"
-#include "util.h"
 #include "utf8.h"
 #include "json.h"
 #include "set.h"
@@ -725,7 +724,6 @@ error:
 out:
         scope->size = size;
         scope->obj = items;
-        items = NULL;
 
 	return scope->type;
 }

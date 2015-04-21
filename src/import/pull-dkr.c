@@ -118,7 +118,7 @@ DkrPull* dkr_pull_unref(DkrPull *i) {
         }
 
         free(i->name);
-        free(i->tag);
+        free(i->reference);
         free(i->id);
         free(i->response_token);
         free(i->response_registries);
@@ -620,7 +620,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
 		// directly fetch the image manifest from the V2 registry
 		// effectively skipping the `tags` job in V2 workflow
-                url = strjoina(PROTOCOL_PREFIX, i->response_registries[0], "/v2/", i->name, "/manifests/", i->tag);
+                url = strjoina(PROTOCOL_PREFIX, i->response_registries[0], "/v2/", i->name, "/manifests/", i->reference);
                 r = pull_job_new(&i->ancestry_job, url, i->glue, i);
                 if (r < 0) {
                         log_error_errno(r, "Failed to allocate tags job: %m");
@@ -783,7 +783,7 @@ static void dkr_pull_job_on_finished(PullJob *j) {
                 log_info("Index lookup succeeded, directed to registry %s.", i->response_registries[0]);
                 dkr_pull_report_progress(i, DKR_RESOLVING);
 
-                url = strjoina(PROTOCOL_PREFIX, i->response_registries[0], "/v1/repositories/", i->name, "/tags/", i->tag);
+                url = strjoina(PROTOCOL_PREFIX, i->response_registries[0], "/v1/repositories/", i->name, "/tags/", i->reference);
                 r = pull_job_new(&i->tags_job, url, i->glue, i);
                 if (r < 0) {
                         log_error_errno(r, "Failed to allocate tags job: %m");
@@ -970,7 +970,7 @@ finish:
 
 static int dkr_pull_job_on_header(PullJob *j, const char *header, size_t sz)  {
         _cleanup_free_ char *registry = NULL;
-        char *token;
+        char *token, *digest;
         DkrPull *i;
         int r;
 
@@ -993,7 +993,7 @@ static int dkr_pull_job_on_header(PullJob *j, const char *header, size_t sz)  {
                 return log_oom();
         if (r > 0) {
                 free(i->response_digest);
-                i->response_digest = token;
+                i->response_digest = digest;
                 return 0;
         }
 
@@ -1051,7 +1051,7 @@ int dkr_pull_start(DkrPull *i, const char *name, const char *reference, const ch
         r = free_and_strdup(&i->name, name);
         if (r < 0)
                 return r;
-        r = free_and_strdup(&i->reference, referebce);
+        r = free_and_strdup(&i->reference, reference);
         if (r < 0)
                 return r;
 
