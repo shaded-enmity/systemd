@@ -118,7 +118,7 @@ DkrPull* dkr_pull_unref(DkrPull *i) {
         }
 
         free(i->name);
-        free(i->tag);
+        free(i->reference);
         free(i->id);
         free(i->response_token);
         free(i->response_registries);
@@ -620,7 +620,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
 		// directly fetch the image manifest from the V2 registry
 		// effectively skipping the `tags` job in V2 workflow
-                url = strjoina(PROTOCOL_PREFIX, i->response_registries[0], "/v2/", i->name, "/manifests/", i->tag);
+                url = strjoina(PROTOCOL_PREFIX, i->response_registries[0], "/v2/", i->name, "/manifests/", i->reference);
                 r = pull_job_new(&i->ancestry_job, url, i->glue, i);
                 if (r < 0) {
                         log_error_errno(r, "Failed to allocate tags job: %m");
@@ -783,7 +783,7 @@ static void dkr_pull_job_on_finished(PullJob *j) {
                 log_info("Index lookup succeeded, directed to registry %s.", i->response_registries[0]);
                 dkr_pull_report_progress(i, DKR_RESOLVING);
 
-                url = strjoina(PROTOCOL_PREFIX, i->response_registries[0], "/v1/repositories/", i->name, "/tags/", i->tag);
+                url = strjoina(PROTOCOL_PREFIX, i->response_registries[0], "/v1/repositories/", i->name, "/tags/", i->reference);
                 r = pull_job_new(&i->tags_job, url, i->glue, i);
                 if (r < 0) {
                         log_error_errno(r, "Failed to allocate tags job: %m");
