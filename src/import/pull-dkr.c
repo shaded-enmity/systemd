@@ -411,7 +411,7 @@ static int dkr_pull_add_token(DkrPull *i, PullJob *j) {
         else
                 t = HEADER_TOKEN " true";
 
-        j->request_header = curl_slist_new("Accept: application/json", t, NULL);
+        j->request_header = curl_slist_new("Accept: application/json\n" USER_AGENT_V2, t, NULL);
         if (!j->request_header)
                 return -ENOMEM;
 
@@ -640,10 +640,10 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
                 i->ancestry_job->on_finished = dkr_pull_job_on_finished_v2;
                 i->ancestry_job->on_progress = dkr_pull_job_on_progress;
-                if (curl_easy_setopt(i->ancestry_job->curl, CURLOPT_USERAGENT, USER_AGENT_V2) != CURLE_OK) {
+                /*if (curl_easy_setopt(i->ancestry_job->curl, CURLOPT_USERAGENT, USER_AGENT_V2) != CURLE_OK) {
                         log_error("Unable to set USER AGENT ;/");
                         goto finish;
-                }
+                }*/
 
                 r = pull_job_begin(i->ancestry_job);
                 if (r < 0) {
