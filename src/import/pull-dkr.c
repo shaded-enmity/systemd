@@ -970,7 +970,7 @@ finish:
 
 static int dkr_pull_job_on_header(PullJob *j, const char *header, size_t sz)  {
         _cleanup_free_ char *registry = NULL;
-        char *token;
+        char *token, *digest;
         DkrPull *i;
         int r;
 
@@ -993,7 +993,7 @@ static int dkr_pull_job_on_header(PullJob *j, const char *header, size_t sz)  {
                 return log_oom();
         if (r > 0) {
                 free(i->response_digest);
-                i->response_digest = token;
+                i->response_digest = digest;
                 return 0;
         }
 
@@ -1051,7 +1051,7 @@ int dkr_pull_start(DkrPull *i, const char *name, const char *reference, const ch
         r = free_and_strdup(&i->name, name);
         if (r < 0)
                 return r;
-        r = free_and_strdup(&i->reference, referebce);
+        r = free_and_strdup(&i->reference, reference);
         if (r < 0)
                 return r;
 
