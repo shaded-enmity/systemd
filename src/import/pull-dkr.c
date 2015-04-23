@@ -647,6 +647,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 unsigned n;
 
                 assert(!i->layer_job);
+                log_info("%s", j->payload);
                 /*
                 r = parse_ancestry(j->payload, j->payload_size, &ancestry);
                 if (r < 0) {
@@ -670,13 +671,14 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 i->ancestry = ancestry;
                 i->n_ancestry = n;
                 i->current_ancestry = 0;
-                */
+
                 dkr_pull_report_progress(i, DKR_DOWNLOADING);
 
                 r = dkr_pull_pull_layer(i);
                 if (r < 0)
                         goto finish;
-
+                */
+                goto finish;
         } else if (i->layer_job == j) {
                 assert(i->temp_path);
                 assert(i->final_path);
