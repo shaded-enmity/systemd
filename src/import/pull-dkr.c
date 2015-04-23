@@ -641,6 +641,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 i->ancestry_job->on_finished = dkr_pull_job_on_finished_v2;
                 i->ancestry_job->on_progress = dkr_pull_job_on_progress;
                 if (curl_easy_setopt(i->ancestry_job->curl, CURLOPT_USERAGENT, USER_AGENT_V2) != CURLE_OK) {
+                        log_error("Unable to set USER AGENT ;/");
                         goto finish;
                 }
 
