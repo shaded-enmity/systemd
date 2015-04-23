@@ -87,8 +87,9 @@ struct DkrPull {
 #define PROTOCOL_PREFIX "https://"
 
 #define HEADER_TOKEN "X-Do" /* the HTTP header for the auth token */ "cker-Token:"
-#define HEADER_REGISTRY "X-Do" /*the HTTP header for the registry */ "cker-Endpoints:"
-#define HEADER_DIGEST "Do" /*the HTTP header for the manifest digest */ "cker-Content-Digest:"
+#define HEADER_REGISTRY "X-Do" /* the HTTP header for the registry */ "cker-Endpoints:"
+#define HEADER_DIGEST "Do" /* the HTTP header for the manifest digest */ "cker-Content-Digest:"
+#define USER_AGENT_V2 "do" /* otherwise we get load-balanced(!) to a V1 registyry */ "cker/1.6.0"
 
 #define LAYERS_MAX 2048
 
@@ -635,6 +636,9 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
                 i->ancestry_job->on_finished = dkr_pull_job_on_finished_v2;
                 i->ancestry_job->on_progress = dkr_pull_job_on_progress;
+                if (curl_easy_setopt(j->curl, CURLOPT_USERAGENT, USER_AGENT_V2) != CURLE_OK) {
+                        return -EIO;
+                }
 
                 r = pull_job_begin(i->ancestry_job);
                 if (r < 0) {
