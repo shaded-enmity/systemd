@@ -411,6 +411,8 @@ static int dkr_pull_add_token(DkrPull *i, PullJob *j) {
         else
                 t = HEADER_TOKEN " true";
 
+        log_info("Token:\n%s\n\nAgent:\n%s\n\n", i->response_token, USER_AGENT_V2);
+
         j->request_header = curl_slist_new("Accept: application/json", USER_AGENT_V2, t, NULL);
         if (!j->request_header)
                 return -ENOMEM;
