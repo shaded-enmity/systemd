@@ -602,6 +602,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
 	assert(i->tags_job != j); // executing `tags_job` is an error in V2
 
+        log_info("LOG");
+
         if (i->images_job == j) {
                 const char *url;
 
