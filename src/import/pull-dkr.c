@@ -87,8 +87,9 @@ struct DkrPull {
 #define PROTOCOL_PREFIX "https://"
 
 #define HEADER_TOKEN "X-Do" /* the HTTP header for the auth token */ "cker-Token:"
-#define HEADER_REGISTRY "X-Do" /*the HTTP header for the registry */ "cker-Endpoints:"
-#define HEADER_DIGEST "Do" /*the HTTP header for the manifest digest */ "cker-Content-Digest:"
+#define HEADER_REGISTRY "X-Do" /* the HTTP header for the registry */ "cker-Endpoints:"
+#define HEADER_DIGEST "Do" /* the HTTP header for the manifest digest */ "cker-Content-Digest:"
+#define USER_AGENT_V2 "User-Agent: do" /* otherwise we get load-balanced(!) to a V1 registyry */ "cker/1.6.0"
 
 #define LAYERS_MAX 2048
 
@@ -410,7 +411,9 @@ static int dkr_pull_add_token(DkrPull *i, PullJob *j) {
         else
                 t = HEADER_TOKEN " true";
 
-        j->request_header = curl_slist_new("Accept: application/json", t, NULL);
+        log_info("Token:\n%s\n\nAgent:\n%s\n\n", i->response_token, USER_AGENT_V2);
+
+        j->request_header = curl_slist_new("Accept: application/json", USER_AGENT_V2, t, NULL);
         if (!j->request_header)
                 return -ENOMEM;
 
@@ -584,6 +587,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
         assert(j);
         assert(j->userdata);
 
+        log_info("LOG");
+
         i = j->userdata;
         if (j->error != 0) {
                 if (j == i->images_job)
@@ -600,6 +605,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
         }
 
 	assert(i->tags_job != j); // executing `tags_job` is an error in V2
+
+        log_info("LOG2");
 
         if (i->images_job == j) {
                 const char *url;
@@ -635,6 +642,10 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
                 i->ancestry_job->on_finished = dkr_pull_job_on_finished_v2;
                 i->ancestry_job->on_progress = dkr_pull_job_on_progress;
+                /*if (curl_easy_setopt(i->ancestry_job->curl, CURLOPT_USERAGENT, USER_AGENT_V2) != CURLE_OK) {
+                        log_error("Unable to set USER AGENT ;/");
+                        goto finish;
+                }*/
 
                 r = pull_job_begin(i->ancestry_job);
                 if (r < 0) {
@@ -647,6 +658,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 unsigned n;
 
                 assert(!i->layer_job);
+                log_info("JSON:\n%s", j->payload);
                 /*
                 r = parse_ancestry(j->payload, j->payload_size, &ancestry);
                 if (r < 0) {
@@ -670,13 +682,14 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 i->ancestry = ancestry;
                 i->n_ancestry = n;
                 i->current_ancestry = 0;
-                */
+
                 dkr_pull_report_progress(i, DKR_DOWNLOADING);
 
                 r = dkr_pull_pull_layer(i);
                 if (r < 0)
                         goto finish;
-
+                */
+                goto finish;
         } else if (i->layer_job == j) {
                 assert(i->temp_path);
                 assert(i->final_path);
