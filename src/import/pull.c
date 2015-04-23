@@ -294,9 +294,9 @@ static int pull_dkr(int argc, char *argv[], void *userdata) {
                         }
                 }
 
-                log_info("Pulling '%s' with tag '%s', saving as '%s'.", name, tag, local);
+                log_info("Pulling '%s' with reference '%s', saving as '%s'.", name, reference, local);
         } else
-                log_info("Pulling '%s' with tag '%s'.", name, tag);
+                log_info("Pulling '%s' with reference '%s'.", name, reference);
 
         r = sd_event_default(&event);
         if (r < 0)
@@ -310,7 +310,7 @@ static int pull_dkr(int argc, char *argv[], void *userdata) {
         if (r < 0)
                 return log_error_errno(r, "Failed to allocate puller: %m");
 
-        r = dkr_pull_start(pull, name, reference, local, arg_force);
+        r = dkr_pull_start(pull, name, reference, local, arg_force, PULL_V2);
         if (r < 0)
                 return log_error_errno(r, "Failed to pull image: %m");
 

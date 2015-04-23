@@ -647,7 +647,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 unsigned n;
 
                 assert(!i->layer_job);
-
+                /*
                 r = parse_ancestry(j->payload, j->payload_size, &ancestry);
                 if (r < 0) {
                         log_error_errno(r, "Failed to parse JSON id.");
@@ -670,7 +670,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 i->ancestry = ancestry;
                 i->n_ancestry = n;
                 i->current_ancestry = 0;
-
+                */
                 dkr_pull_report_progress(i, DKR_DOWNLOADING);
 
                 r = dkr_pull_pull_layer(i);
