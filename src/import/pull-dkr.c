@@ -742,7 +742,13 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                                 value = strdupa(hash + 1);
                                 hash = strndupa(layer, hash - layer);
 
-                                log_info(" -- %u. %s [`%s`=`%s`]", z, layer, hash, value);
+                                if (strcmp(hash, "sha256") != 0 || !in_charset(value, "1234567890abcdef")) {
+                                        r = -EBADMSG;
+                                        goto finish;
+
+                                }
+
+                                log_info(" -- %u. %s", z, layer);
                         } else
                                 log_info(" -- %u. layer is empty", z);
                 }
