@@ -898,13 +898,12 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 }
 
                 e = json_variant_value(compat, "id");
-                log_info("v1ID: %s", json_variant_string(e));
 
                 strv_free(i->ancestry);
                 i->ancestry = ancestry;
                 i->n_ancestry = size;
                 i->current_ancestry = 0;
-                i->id = i->ancestry[size - 1];
+                i->id = json_variant_string(e);
                 ancestry = NULL;
 
                 dkr_pull_report_progress(i, DKR_DOWNLOADING);
