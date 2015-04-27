@@ -825,7 +825,6 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 json_variant *e = NULL;
                 _cleanup_strv_free_ char **ancestry = NULL;
                 size_t allocated = 0, size = 0;
-                char *path;
 
                 assert(!i->layer_job);
 
@@ -899,14 +898,15 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 }
 
                 e = json_variant_value(compat, "id");
-                log_info("Docker provenance:\n  ImageID: %s\n  Digest: %s", json_variant_string(e), i->response_digest);
+                log_info("Docker provenance:\n  ImageID: %s\n  Digest:  %s", json_variant_string(e), i->response_digest);
 
                 strv_free(i->ancestry);
                 i->ancestry = ancestry;
                 i->n_ancestry = size;
                 i->current_ancestry = 0;
                 i->id = ancestry[0];
-                i->image_root = strjoina(i->image_root, "/.dkr-", json_variant_string(e), NULL);
+                free(i->image_root);
+                i->image_root = strjoin(i->image_root, "/.dkr-", json_variant_string(e), NULL);
                 ancestry = NULL;
 
                 dkr_pull_report_progress(i, DKR_DOWNLOADING);
