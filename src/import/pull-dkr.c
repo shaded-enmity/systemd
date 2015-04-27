@@ -907,8 +907,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 i->id = strdup(json_variant_string(e));
                 path = strjoina(i->image_root, "/.dkr-", i->id, NULL);
                 log_info("path: %s", path);
-
                 mkdir_parents_label(path, 0700);
+
                 ancestry = NULL;
 
                 dkr_pull_report_progress(i, DKR_DOWNLOADING);
@@ -942,6 +942,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         goto finish;
                 }
 
+                log_info("temp: %s\nfinl: %s", i->temp_path, i->final_path);
                 if (rename(i->temp_path, i->final_path) < 0) {
                         log_error_errno(errno, "Failed to rename snaphsot: %m");
                         goto finish;
