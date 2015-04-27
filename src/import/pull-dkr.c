@@ -716,6 +716,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
         } else if (i->tags_job == j) {
                 const char *url;
+                _cleanup_free_ const char *buf;
                 _cleanup_jsonunref_ json_variant *doc = NULL;
                 json_variant *e = NULL;
 
@@ -723,7 +724,9 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 assert(!i->json_job);
                 assert(!i->layer_job);
 
-                if (0 > json_parse((const char *)j->payload, &doc)) {
+                buf = strndup(j->payload, j->payload_size);
+
+                if (0 > json_parse(buf, &doc)) {
                         r = -EBADMSG;
                         log_error("Unable to parse bearer token\n%s", j->payload);
                         goto finish;
