@@ -657,7 +657,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         goto finish;
                 }
 
-                if (0 > json_parse(j->payload, &doc)) {
+                if (0 > json_parse((const char *)j->payload, &doc)) {
                         r = -EBADMSG;
                         log_error("Unable to parse bearer token");
                         goto finish;
@@ -698,13 +698,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 printf("===========================================================================================\n");
                 for (unsigned x = 0; x < j->payload_size; x++) {
                         putchar(j->payload[x]);
-                        if (j->payload[x] == '\0') {
-                                putchar('_');
-                                putchar('_');
-                                putchar('#');
-                        }
                 }*/
-                if (0 > json_parse(j->payload, &doc)) {
+                if (0 > json_parse((const char *)j->payload, &doc)) {
                         r = -EBADMSG;
                         log_error("Invalid JSON Manifest");
                         goto finish;
