@@ -537,6 +537,8 @@ static void dkr_pull_job_on_progress(PullJob *j) {
                                                                    DKR_DOWNLOADING);
 }
 
+static void dkr_pull_job_on_finished_v2(PullJob *j);
+
 static int dkr_pull_pull_layer_v2(DkrPull *i) {
         _cleanup_free_ char *path = NULL;
         const char *url, *layer = NULL;
