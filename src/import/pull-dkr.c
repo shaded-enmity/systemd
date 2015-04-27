@@ -899,16 +899,14 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 }
 
                 e = json_variant_value(compat, "id");
+                log_info("Docker provenance:\n  ImageID: %s\n  Digest: %s", json_variant_string(e), i->response_digest);
 
                 strv_free(i->ancestry);
                 i->ancestry = ancestry;
                 i->n_ancestry = size;
                 i->current_ancestry = 0;
-                i->id = strdup(json_variant_string(e));
-                path = strjoina(i->image_root, "/.dkr-", i->id, NULL);
-                log_info("path: %s", path);
-                mkdir_parents_label(path, 0700);
-
+                i->id = ancestry[0];
+                i->image_root = strjoina(i->image_root, "/.dkr-", json_variant_string(e), NULL);
                 ancestry = NULL;
 
                 dkr_pull_report_progress(i, DKR_DOWNLOADING);
@@ -942,7 +940,6 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         goto finish;
                 }
 
-                log_info("temp: %s\nfinl: %s", i->temp_path, i->final_path);
                 if (rename(i->temp_path, i->final_path) < 0) {
                         log_error_errno(errno, "Failed to rename snaphsot: %m");
                         goto finish;
