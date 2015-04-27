@@ -890,6 +890,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 }
                 e = json_variant_element(e, 0);
                 e = json_variant_value(e, "v1Compatibility");
+                printf("%s", json_variant_string(e));
 
                 if (0 > json_parse(json_variant_string(e), &compat)) {
                         r = -EBADMSG;
