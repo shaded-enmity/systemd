@@ -718,7 +718,8 @@ static int json_scoped_parse(json_variant **tokens, size_t *i, size_t n, json_va
 	}
 
 error:
-        json_raw_unref(items, size);
+        if (items)
+                json_raw_unref(items, size);
         return -EBADMSG;
 
 out:
