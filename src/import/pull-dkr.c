@@ -825,6 +825,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 json_variant *e = NULL;
                 _cleanup_strv_free_ char **ancestry = NULL;
                 size_t allocated = 0, size = 0;
+                char *path;
 
                 assert(!i->layer_job);
 
@@ -904,7 +905,10 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 i->n_ancestry = size;
                 i->current_ancestry = 0;
                 i->id = strdup(json_variant_string(e));
-                mkdir_parents_label(strjoina(i->image_root, "/.dkr-", i->id, NULL), 0700);
+                path = strjoina(i->image_root, "/.dkr-", i->id, NULL);
+                log_info("path: %s", path);
+
+                mkdir_parents_label(path, 0700);
                 ancestry = NULL;
 
                 dkr_pull_report_progress(i, DKR_DOWNLOADING);
