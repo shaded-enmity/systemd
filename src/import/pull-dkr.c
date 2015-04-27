@@ -831,6 +831,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 i->ancestry = ancestry;
                 i->n_ancestry = size;
                 i->current_ancestry = 0;
+                i->id = i->ancestry[size - 1];
                 ancestry = NULL;
 
                 dkr_pull_report_progress(i, DKR_DOWNLOADING);
@@ -885,10 +886,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
         } else if (i->json_job != j)
                 assert_not_reached("Got finished event for unknown curl object");
 
-        if (!dkr_pull_is_done(i)) {
-                log_info("undone ");
+        if (!dkr_pull_is_done(i))
                 return;
-        }
 
         dkr_pull_report_progress(i, DKR_COPYING);
 
