@@ -821,6 +821,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
         } else if (i->ancestry_job == j) {
 
                 _cleanup_jsonunref_ json_variant *doc = NULL;
+                _cleanup_jsonunref_ json_variant *compat = NULL;
                 json_variant *e = NULL;
                 _cleanup_strv_free_ char **ancestry = NULL;
                 size_t allocated = 0, size = 0;
@@ -832,8 +833,6 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         log_error("Invalid JSON Manifest");
                         goto finish;
                 }
-
-                printf("%s", (const char *)j->payload);
 
                 e = json_variant_value(doc, "fsLayers");
                 if (!e || e->type != JSON_VARIANT_ARRAY) {
@@ -891,7 +890,15 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 }
                 e = json_variant_element(e, e->size - 1);
                 e = json_variant_value(e, "v1Compatibility");
-                printf("######\n%s\n#######", json_variant_string(e));
+
+                if (0 > json_parse(json_variant_string(e), &compat)) {
+                        r = -EBADMSG;
+                        log_error("Invalid v1Compatibility JSON");
+                        goto finish;
+                }
+
+                e = json_variant_value(compat, "id");
+                log_info("v1ID: %s", json_variant_string(e));
 
                 strv_free(i->ancestry);
                 i->ancestry = ancestry;
