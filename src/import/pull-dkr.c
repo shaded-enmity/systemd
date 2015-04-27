@@ -731,9 +731,19 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
                         g = json_variant_value(f, "blobSum");
                         layer = json_variant_string(g);
-                        if (strcmp(layer, VOID_LAYER) != 0)
-                                log_info(" -- %u. %s", z, layer);
-                        else
+                        if (strcmp(layer, VOID_LAYER) != 0) {
+                                const char *hash, *value;
+                                hash = strchr(layer, ':');
+                                if (!hash) {
+                                        r = -EBADMSG;
+                                        goto finish;
+                                }
+
+                                hash = strndupa(layer, hash - layer - 1);
+                                value = strndupa(layer, hash + 1);
+
+                                log_info(" -- %u. %s [`%s`=`%s`]", z, layer, hash, value);
+                        } else
                                 log_info(" -- %u. layer is empty", z);
                 }
                 /*
