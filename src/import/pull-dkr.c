@@ -757,6 +757,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
                 i->ancestry_job->on_finished = dkr_pull_job_on_finished_v2;
                 i->ancestry_job->on_progress = dkr_pull_job_on_progress;
+                i->ancestry_job->on_header = dkr_pull_job_on_header;
 
                 r = pull_job_begin(i->ancestry_job);
                 if (r < 0) {
