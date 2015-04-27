@@ -666,8 +666,6 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
         assert(j);
         assert(j->userdata);
 
-        //log_info("LOG");
-
         i = j->userdata;
         if (j->error != 0) {
                 if (j == i->images_job)
@@ -745,7 +743,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 url = strjoina(PROTOCOL_PREFIX, i->response_registries[0], "/v2/", i->name, "/manifests/", i->reference);
                 r = pull_job_new(&i->ancestry_job, url, i->glue, i);
                 if (r < 0) {
-                        log_error_errno(r, "Failed to allocate tags job: %m");
+                        log_error_errno(r, "Failed to allocate ancestry job: %m");
                         goto finish;
                 }
 
@@ -760,7 +758,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
                 r = pull_job_begin(i->ancestry_job);
                 if (r < 0) {
-                        log_error_errno(r, "Failed to start tags job: %m");
+                        log_error_errno(r, "Failed to start ancestry job: %m");
                         goto finish;
                 }
 
@@ -820,10 +818,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                                 ancestry[size+1] = NULL;
                                 size += 1;
 
-                                log_info(" -- %u. %s", z, layer);
-
-                        } else
-                                log_info(" -- %u. layer is empty", z);
+                                log_info(" -- %u. %s", size, layer);
+                        }
                 }
 
                 log_info(" - size: %"PRIu64, size);
