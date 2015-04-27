@@ -695,6 +695,11 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 //log_info("JSON(%d bytes):\n%s", j->payload_size, j->payload);
                 for (unsigned x = 0; x < j->payload_size; x++) {
                         putchar(j->payload[x]);
+                        if (j->payload[x] == 0) {
+                                putchar('_');
+                                putchar('_');
+                                putchar('#');
+                        }
                 }
 
                 /*
