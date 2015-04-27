@@ -1163,6 +1163,7 @@ static int dkr_pull_job_on_header(PullJob *j, const char *header, size_t sz)  {
         if (r < 0)
                 return log_oom();
         if (r > 0) {
+                log_info("[!] DIGEST: %s", digest);
                 free(i->response_digest);
                 i->response_digest = digest;
                 return 0;
