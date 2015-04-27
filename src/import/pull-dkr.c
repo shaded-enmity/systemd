@@ -413,9 +413,7 @@ static int dkr_pull_add_token(DkrPull *i, PullJob *j) {
         else
                 t = HEADER_TOKEN " true";
 
-        log_info("Token:\n%s\n\nAgent:\n%s\n\n", i->response_token, USER_AGENT_V2);
-
-        j->request_header = curl_slist_new("Accept: application/json", USER_AGENT_V2, t, NULL);
+        j->request_header = curl_slist_new("Accept: application/json", t, NULL);
         if (!j->request_header)
                 return -ENOMEM;
 
@@ -685,7 +683,6 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
         } else if (i->ancestry_job == j) {
 
-                //char **ancestry = NULL, **k;
                 _cleanup_jsonunref_ json_variant *doc = NULL;
                 json_variant *e = NULL;
 
