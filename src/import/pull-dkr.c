@@ -890,6 +890,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         goto finish;
                 }
                 e = json_variant_element(e, e->size - 1);
+                e = json_variant_value(e, "v1Compatibility");
                 printf("%s", json_variant_string(e));
 
                 strv_free(i->ancestry);
