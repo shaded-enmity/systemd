@@ -658,6 +658,61 @@ static int dkr_pull_pull_layer(DkrPull *i) {
         return 0;
 }
 
+static int dkr_pull_job_on_header(PullJob *j, const char *header, size_t sz)  {
+        _cleanup_free_ char *registry = NULL;
+        char *token, *digest;
+        DkrPull *i;
+        int r;
+
+        assert(j);
+        assert(j->userdata);
+
+        i = j->userdata;
+        printf("%s", header);
+        r = curl_header_strdup(header, sz, HEADER_TOKEN, &token);
+        if (r < 0)
+                return log_oom();
+        if (r > 0) {
+                free(i->response_token);
+                i->response_token = token;
+                return 0;
+        }
+
+        r = curl_header_strdup(header, sz, HEADER_DIGEST, &digest);
+        if (r < 0)
+                return log_oom();
+        if (r > 0) {
+                log_info("[!] DIGEST: %s", digest);
+                free(i->response_digest);
+                i->response_digest = digest;
+                return 0;
+        }
+
+        r = curl_header_strdup(header, sz, HEADER_REGISTRY, &registry);
+        if (r < 0)
+                return log_oom();
+        if (r > 0) {
+                char **l, **k;
+
+                l = strv_split(registry, ",");
+                if (!l)
+                        return log_oom();
+
+                STRV_FOREACH(k, l) {
+                        if (!hostname_is_valid(*k)) {
+                                log_error("Registry hostname is not valid.");
+                                strv_free(l);
+                                return -EBADMSG;
+                        }
+                }
+
+                strv_free(i->response_registries);
+                i->response_registries = l;
+        }
+
+        return 0;
+}
+
 static void dkr_pull_job_on_finished_v2(PullJob *j) {
         DkrPull *i;
         int r;
@@ -1138,61 +1193,6 @@ finish:
                 i->on_finished(i, r, i->userdata);
         else
                 sd_event_exit(i->event, r);
-}
-
-static int dkr_pull_job_on_header(PullJob *j, const char *header, size_t sz)  {
-        _cleanup_free_ char *registry = NULL;
-        char *token, *digest;
-        DkrPull *i;
-        int r;
-
-        assert(j);
-        assert(j->userdata);
-
-        i = j->userdata;
-        printf("%s", header);
-        r = curl_header_strdup(header, sz, HEADER_TOKEN, &token);
-        if (r < 0)
-                return log_oom();
-        if (r > 0) {
-                free(i->response_token);
-                i->response_token = token;
-                return 0;
-        }
-
-        r = curl_header_strdup(header, sz, HEADER_DIGEST, &digest);
-        if (r < 0)
-                return log_oom();
-        if (r > 0) {
-                log_info("[!] DIGEST: %s", digest);
-                free(i->response_digest);
-                i->response_digest = digest;
-                return 0;
-        }
-
-        r = curl_header_strdup(header, sz, HEADER_REGISTRY, &registry);
-        if (r < 0)
-                return log_oom();
-        if (r > 0) {
-                char **l, **k;
-
-                l = strv_split(registry, ",");
-                if (!l)
-                        return log_oom();
-
-                STRV_FOREACH(k, l) {
-                        if (!hostname_is_valid(*k)) {
-                                log_error("Registry hostname is not valid.");
-                                strv_free(l);
-                                return -EBADMSG;
-                        }
-                }
-
-                strv_free(i->response_registries);
-                i->response_registries = l;
-        }
-
-        return 0;
 }
 
 int dkr_pull_start(DkrPull *i, const char *name, const char *reference, const char *local, bool force_local, enum PullStrategy strategy) {
