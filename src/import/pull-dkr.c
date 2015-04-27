@@ -1150,7 +1150,7 @@ static int dkr_pull_job_on_header(PullJob *j, const char *header, size_t sz)  {
         assert(j->userdata);
 
         i = j->userdata;
-
+        printf("%s", header);
         r = curl_header_strdup(header, sz, HEADER_TOKEN, &token);
         if (r < 0)
                 return log_oom();
