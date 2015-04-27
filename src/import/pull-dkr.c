@@ -644,8 +644,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         goto finish;
                 }
 */
-                i->ancestry_job->on_finished = dkr_pull_job_on_finished_v2;
-                i->ancestry_job->on_progress = dkr_pull_job_on_progress;
+                i->tags_job->on_finished = dkr_pull_job_on_finished_v2;
+                i->tags_job->on_progress = dkr_pull_job_on_progress;
                 /*if (curl_easy_setopt(i->ancestry_job->curl, CURLOPT_USERAGENT, USER_AGENT_V2) != CURLE_OK) {
                         log_error("Unable to set USER AGENT ;/");
                         goto finish;
@@ -660,7 +660,6 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
         } else if (i->tags_job == j) {
                 const char *url;
 
-                assert(!i->tags_job);
                 assert(!i->ancestry_job);
                 assert(!i->json_job);
                 assert(!i->layer_job);
