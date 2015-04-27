@@ -641,6 +641,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
         } else if (i->tags_job == j) {
                 const char *url;
+                const char *bt;
                 _cleanup_jsonunref_ json_variant *doc = NULL;
                 json_variant *e = NULL;
 
@@ -663,13 +664,10 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 e = json_variant_value(doc, "token");
                 log_info("Token:\n%s", json_variant_string(e));
 
-                //log_info("Index lookup succeeded, directed to registry %s.", i->response_registries[0]);
-                //dkr_pull_report_progress(i, DKR_RESOLVING);
-                //log_info("JSON:\n%s", j->payload);
-                goto finish;
+                if (i->response_token) free(i->response_token);
+                i->response_token = strdup(json_variant_string(e));
 
-		// directly fetch the image manifest from the V2 registry
-		// effectively skipping the `tags` job in V2 workflow
+                bt = strjoina("Authorization: Bearer ", i->response_token);
                 url = strjoina(PROTOCOL_PREFIX, i->response_registries[0], "/v2/", i->name, "/manifests/", i->reference);
                 r = pull_job_new(&i->ancestry_job, url, i->glue, i);
                 if (r < 0) {
@@ -677,12 +675,14 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         goto finish;
                 }
 
-                r = dkr_pull_add_token(i, i->ancestry_job);
+                i->ancestry_job->request_header = curl_slist_new("Accept: application/json", USER_AGENT_V2, bt, NULL);
+
+/*                r = dkr_pull_add_token(i, i->ancestry_job);
                 if (r < 0) {
                         log_oom();
                         goto finish;
                 }
-
+*/
                 i->ancestry_job->on_finished = dkr_pull_job_on_finished_v2;
                 i->ancestry_job->on_progress = dkr_pull_job_on_progress;
                 /*if (curl_easy_setopt(i->ancestry_job->curl, CURLOPT_USERAGENT, USER_AGENT_V2) != CURLE_OK) {
@@ -690,7 +690,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         goto finish;
                 }*/
 
-                r = pull_job_begin(i->tags_job);
+                r = pull_job_begin(i->ancestry_job);
                 if (r < 0) {
                         log_error_errno(r, "Failed to start tags job: %m");
                         goto finish;
