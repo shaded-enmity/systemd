@@ -687,9 +687,9 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 json_variant *e = NULL;
 
                 assert(!i->layer_job);
-                log_info("===========================================================================================");
-                log_info("JSON(%"PRIu64" bytes):\n%s", j->payload_size, (const char*)j->payload);
-                log_info("===========================================================================================");
+                //log_info("===========================================================================================");
+                //log_info("JSON(%"PRIu64" bytes):\n%s", j->payload_size, (const char*)j->payload);
+                //log_info("===========================================================================================");
 
                 if (0 > json_parse((const char *)j->payload, &doc)) {
                         r = -EBADMSG;
@@ -697,7 +697,9 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         goto finish;
                 }
 
+                e = json_variant_value(doc, "fsLayers");
                 log_info("JSON Manifest v%"PRIi64" for %s parsed!", json_variant_integer(json_variant_value(doc, "schemaVersion")), json_variant_string(json_variant_value(doc, "name")));
+                log_info(" -- layers: %u", e->size);
                 /*
                 r = parse_ancestry(j->payload, j->payload_size, &ancestry);
                 if (r < 0) {
