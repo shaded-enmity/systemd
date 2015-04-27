@@ -616,11 +616,6 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 assert(!i->json_job);
                 assert(!i->layer_job);
 
-                /*slash = strchr(name, '/');
-                if (slash) {
-                        name = slash + 1;
-                }*/
-
                 if (strv_isempty(i->response_registries)) {
                         r = -EBADMSG;
                         log_error("Didn't get registry information.");
@@ -669,12 +664,10 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 }
 
                 e = json_variant_value(doc, "token");
-                //log_info("Token:\n%s", json_variant_string(e));
                 if (i->response_token) free(i->response_token);
                 i->response_token = strdup(json_variant_string(e));
 
                 bt = strjoina("Authorization: Bearer ", i->response_token);
-                log_info("%s", bt);
 
                 url = strjoina(PROTOCOL_PREFIX, i->response_registries[0], "/v2/", i->name, "/manifests/", i->reference);
                 r = pull_job_new(&i->ancestry_job, url, i->glue, i);
@@ -684,19 +677,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 }
 
                 i->ancestry_job->request_header = curl_slist_new("Accept: application/json", USER_AGENT_V2, bt, NULL);
-
-/*                r = dkr_pull_add_token(i, i->ancestry_job);
-                if (r < 0) {
-                        log_oom();
-                        goto finish;
-                }
-*/
                 i->ancestry_job->on_finished = dkr_pull_job_on_finished_v2;
                 i->ancestry_job->on_progress = dkr_pull_job_on_progress;
-                /*if (curl_easy_setopt(i->ancestry_job->curl, CURLOPT_USERAGENT, USER_AGENT_V2) != CURLE_OK) {
-                        log_error("Unable to set USER AGENT ;/");
-                        goto finish;
-                }*/
 
                 r = pull_job_begin(i->ancestry_job);
                 if (r < 0) {
@@ -710,7 +692,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 unsigned n;
 
                 assert(!i->layer_job);
-                log_info("JSON:\n%s", j->payload);
+                log_info("JSON(%d bytes):\n%s", j->payload_size, j->payload);
                 /*
                 r = parse_ancestry(j->payload, j->payload_size, &ancestry);
                 if (r < 0) {
