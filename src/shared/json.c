@@ -93,7 +93,8 @@ static json_variant *json_raw_unref(json_variant *variant, size_t size) {
 
 static json_variant *json_object_unref(json_variant *variant) {
 	assert(variant);
-	assert(variant->obj);
+        if (!variant->obj)
+                return NULL;
 
         for (unsigned i = 0; i < variant->size; ++i) {
                 json_variant_unref_inner(&variant->obj[i]);
@@ -632,7 +633,7 @@ static int json_scoped_parse(json_variant **tokens, size_t *i, size_t n, json_va
                 bool stopper = !json_is_value(var) && var->value.integer == terminator;
 
 		if (stopper) {
-                        if (state != STATE_COMMA) {
+                        if (state != STATE_COMMA && size > 0) {
                                 //log_info("Unexpected stopper");
                                 goto error;
                         }
@@ -718,7 +719,8 @@ static int json_scoped_parse(json_variant **tokens, size_t *i, size_t n, json_va
 	}
 
 error:
-        json_raw_unref(items, size);
+        if (items)
+                json_raw_unref(items, size);
         return -EBADMSG;
 
 out:
