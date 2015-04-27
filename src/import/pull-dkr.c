@@ -778,7 +778,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         log_error("Invalid JSON Manifest");
                         goto finish;
                 }
-
+                printf("%s", (const char *)j->payload);
                 e = json_variant_value(doc, "fsLayers");
                 if (!e || e->type != JSON_VARIANT_ARRAY) {
                         r = -EBADMSG;
@@ -828,7 +828,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         }
                 }
 
-                e = json_variant_value(doc, "v1Compatibility");
+                e = json_variant_value(doc, "v1compatibility");
                 if (!e || e->type != JSON_VARIANT_ARRAY) {
                         r = -EBADMSG;
                         goto finish;
