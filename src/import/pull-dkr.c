@@ -608,11 +608,18 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
         if (i->images_job == j) {
                 const char *url;
+                const char *name = i->name;
+                char *slash;
 
                 assert(!i->tags_job);
                 assert(!i->ancestry_job);
                 assert(!i->json_job);
                 assert(!i->layer_job);
+
+                slash = strchr("/", name);
+                if (slash) {
+                        name = slash + 1;
+                }
 
                 if (strv_isempty(i->response_registries)) {
                         r = -EBADMSG;
@@ -623,7 +630,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 log_info("Index lookup succeeded, directed to registry %s.", i->response_registries[0]);
                 dkr_pull_report_progress(i, DKR_RESOLVING);
 
-                url = strjoina(BEARER_REALM, "?realm=", BEARER_REALM, "&scope=", i->name, "&service=", BEARER_SERVICE);
+                url = strjoina(BEARER_REALM, "&scope=", i->name, "&service=", BEARER_SERVICE);
                 r = pull_job_new(&i->tags_job, url, i->glue, i);
                 if (r < 0) {
                         log_error_errno(r, "Failed to allocate tags job: %m");
