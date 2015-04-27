@@ -883,7 +883,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 i->final_path = NULL;
 
                 i->current_ancestry ++;
-                r = dkr_pull_pull_layer(i);
+                r = dkr_pull_pull_layer_v2(i);
                 if (r < 0)
                         goto finish;
                 goto finish;
