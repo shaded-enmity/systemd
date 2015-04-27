@@ -780,6 +780,10 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 }
 
                 e = json_variant_value(doc, "fsLayers");
+                if (!e || e->type != JSON_VARIANT_ARRAY) {
+                        r = -EBADMSG;
+                        goto finish;
+                }
                 log_info("JSON Manifest v%"PRIi64" for %s parsed!",
                                 json_variant_integer(json_variant_value(doc, "schemaVersion")),
                                 json_variant_string(json_variant_value(doc, "name")));
@@ -823,6 +827,13 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                                 log_info(" -- %" PRIu64 ". %s", size, layer);
                         }
                 }
+
+                e = json_variant_value(doc, "v1Compatibility");
+                if (!e || e->type != JSON_VARIANT_ARRAY) {
+                        r = -EBADMSG;
+                        goto finish;
+                }
+                log_info("numcompat: %u", e->size);
 
                 strv_free(i->ancestry);
                 i->ancestry = ancestry;
