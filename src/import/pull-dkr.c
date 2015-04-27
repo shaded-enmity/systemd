@@ -888,7 +888,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         r = -EBADMSG;
                         goto finish;
                 }
-                e = json_variant_element(e, e->size - 1);
+                e = json_variant_element(e, 0);
                 e = json_variant_value(e, "v1Compatibility");
 
                 if (0 > json_parse(json_variant_string(e), &compat)) {
