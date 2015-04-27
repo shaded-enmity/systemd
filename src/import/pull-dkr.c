@@ -721,8 +721,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 e = json_variant_value(doc, "fsLayers");
                 log_info("JSON Manifest v%"PRIi64" for %s parsed!", json_variant_integer(json_variant_value(doc, "schemaVersion")), json_variant_string(json_variant_value(doc, "name")));
                 log_info(" -- layers: %u", e->size);
-                for (unsigned i = 0; i < e->size; i++) {
-                        json_variant *f = json_variant_element(e, i), *g = NULL;
+                for (unsigned z = 0; z < e->size; z++) {
+                        json_variant *f = json_variant_element(e, z), *g = NULL;
                         const char* layer;
                         if (f->type != JSON_VARIANT_OBJECT) {
                                 r = -EBADMSG;
@@ -732,7 +732,9 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         g = json_variant_value(f, "blobSum");
                         layer = json_variant_string(g);
                         if (strcmp(layer, VOID_LAYER) != 0)
-                                log_info("%u. %s", i, layer);
+                                log_info(" -- %u. %s", z, layer);
+                        else
+                                log_info(" -- %u. layer is empty", z)
                 }
                 /*
                 r = parse_ancestry(j->payload, j->payload_size, &ancestry);
