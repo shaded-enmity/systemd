@@ -826,6 +826,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 i->ancestry = ancestry;
                 i->n_ancestry = size;
                 i->current_ancestry = 0;
+                ancestry = NULL;
 
                 dkr_pull_report_progress(i, DKR_DOWNLOADING);
 
