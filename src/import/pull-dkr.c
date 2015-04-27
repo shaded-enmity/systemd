@@ -443,30 +443,23 @@ static int dkr_pull_add_bearer_token(DkrPull *i, PullJob *j) {
 static bool dkr_pull_is_done(DkrPull *i) {
         assert(i);
         assert(i->images_job);
-        log_info("1");
         if (i->images_job->state != PULL_JOB_DONE)
                 return false;
 
-        log_info("2");
         if (!i->tags_job || i->tags_job->state != PULL_JOB_DONE)
                 return false;
-        log_info("3");
 
         if (!i->ancestry_job || i->ancestry_job->state != PULL_JOB_DONE)
                 return false;
-        log_info("4");
 
-        if (!i->json_job || i->json_job->state != PULL_JOB_DONE)
+        if (i->json_job && i->json_job->state != PULL_JOB_DONE)
                 return false;
-        log_info("5");
 
         if (i->layer_job && i->layer_job->state != PULL_JOB_DONE)
                 return false;
-        log_info("6");
 
         if (dkr_pull_current_layer(i))
                 return false;
-        log_info("7");
 
         return true;
 }
