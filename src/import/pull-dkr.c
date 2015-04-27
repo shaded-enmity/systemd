@@ -90,6 +90,8 @@ struct DkrPull {
 #define HEADER_REGISTRY "X-Do" /* the HTTP header for the registry */ "cker-Endpoints:"
 #define HEADER_DIGEST "Do" /* the HTTP header for the manifest digest */ "cker-Content-Digest:"
 #define USER_AGENT_V2 "User-Agent: do" /* otherwise we get load-balanced(!) to a V1 registyry */ "cker/1.6.0"
+#define BEARER_REALM "https://auth.doc" /* */ "ker.io/token"
+#define BEARER_SERVICE "registry.doc" /* */ "ker.io"
 
 #define LAYERS_MAX 2048
 
@@ -587,7 +589,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
         assert(j);
         assert(j->userdata);
 
-        log_info("LOG");
+        //log_info("LOG");
 
         i = j->userdata;
         if (j->error != 0) {
@@ -604,9 +606,10 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 goto finish;
         }
 
-	assert(i->tags_job != j); // executing `tags_job` is an error in V2
+        //assert(i->tags_job != j); // executing `tags_job` is an error in V2
+        //or not ... the tags_job is reused for obtaining the bearer token ;>
 
-        log_info("LOG2");
+        //log_info("LOG2");
 
         if (i->images_job == j) {
                 const char *url;
@@ -624,6 +627,54 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
                 log_info("Index lookup succeeded, directed to registry %s.", i->response_registries[0]);
                 dkr_pull_report_progress(i, DKR_RESOLVING);
+
+                url = strjoina(BEARER_REALM, "?realm=", BEARER_REALM, "&service=", BEARER_SERVICE);
+                // directly fetch the image manifest from the V2 registry
+                // effectively skipping the `tags` job in V2 workflow
+                //url = strjoina(PROTOCOL_PREFIX, i->response_registries[0], "/v2/", i->name, "/manifests/", i->reference);
+                r = pull_job_new(&i->tags_job, url, i->glue, i);
+                if (r < 0) {
+                        log_error_errno(r, "Failed to allocate tags job: %m");
+                        goto finish;
+                }
+/*
+                r = dkr_pull_add_token(i, i->ancestry_job);
+                if (r < 0) {
+                        log_oom();
+                        goto finish;
+                }
+*/
+                i->ancestry_job->on_finished = dkr_pull_job_on_finished_v2;
+                i->ancestry_job->on_progress = dkr_pull_job_on_progress;
+                /*if (curl_easy_setopt(i->ancestry_job->curl, CURLOPT_USERAGENT, USER_AGENT_V2) != CURLE_OK) {
+                        log_error("Unable to set USER AGENT ;/");
+                        goto finish;
+                }*/
+
+                r = pull_job_begin(i->tags_job);
+                if (r < 0) {
+                        log_error_errno(r, "Failed to start tags job: %m");
+                        goto finish;
+                }
+
+        } else if (i->tags_job == j) {
+                const char *url;
+
+                assert(!i->tags_job);
+                assert(!i->ancestry_job);
+                assert(!i->json_job);
+                assert(!i->layer_job);
+
+                if (strv_isempty(i->response_registries)) {
+                        r = -EBADMSG;
+                        log_error("Didn't get registry information.");
+                        goto finish;
+                }
+
+                log_info("Index lookup succeeded, directed to registry %s.", i->response_registries[0]);
+                dkr_pull_report_progress(i, DKR_RESOLVING);
+                log_info("JSON:\n%s", j->payload);
+                goto finish;
 
 		// directly fetch the image manifest from the V2 registry
 		// effectively skipping the `tags` job in V2 workflow
@@ -647,13 +698,14 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         goto finish;
                 }*/
 
-                r = pull_job_begin(i->ancestry_job);
+                r = pull_job_begin(i->tags_job);
                 if (r < 0) {
                         log_error_errno(r, "Failed to start tags job: %m");
                         goto finish;
                 }
-		
+
         } else if (i->ancestry_job == j) {
+
                 //char **ancestry = NULL, **k;
                 unsigned n;
 
