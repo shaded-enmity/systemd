@@ -833,6 +833,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         goto finish;
                 }
 
+                printf("%s", (const char *)j->payload);
+
                 e = json_variant_value(doc, "fsLayers");
                 if (!e || e->type != JSON_VARIANT_ARRAY) {
                         r = -EBADMSG;
