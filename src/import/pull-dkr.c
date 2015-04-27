@@ -606,11 +606,6 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 goto finish;
         }
 
-        //assert(i->tags_job != j); // executing `tags_job` is an error in V2
-        //or not ... the tags_job is reused for obtaining the bearer token ;>
-
-        //log_info("LOG2");
-
         if (i->images_job == j) {
                 const char *url;
 
@@ -629,27 +624,14 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 dkr_pull_report_progress(i, DKR_RESOLVING);
 
                 url = strjoina(BEARER_REALM, "?realm=", BEARER_REALM, "&service=", BEARER_SERVICE);
-                // directly fetch the image manifest from the V2 registry
-                // effectively skipping the `tags` job in V2 workflow
-                //url = strjoina(PROTOCOL_PREFIX, i->response_registries[0], "/v2/", i->name, "/manifests/", i->reference);
                 r = pull_job_new(&i->tags_job, url, i->glue, i);
                 if (r < 0) {
                         log_error_errno(r, "Failed to allocate tags job: %m");
                         goto finish;
                 }
-/*
-                r = dkr_pull_add_token(i, i->ancestry_job);
-                if (r < 0) {
-                        log_oom();
-                        goto finish;
-                }
-*/
+
                 i->tags_job->on_finished = dkr_pull_job_on_finished_v2;
                 i->tags_job->on_progress = dkr_pull_job_on_progress;
-                /*if (curl_easy_setopt(i->ancestry_job->curl, CURLOPT_USERAGENT, USER_AGENT_V2) != CURLE_OK) {
-                        log_error("Unable to set USER AGENT ;/");
-                        goto finish;
-                }*/
 
                 r = pull_job_begin(i->tags_job);
                 if (r < 0) {
@@ -659,6 +641,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
         } else if (i->tags_job == j) {
                 const char *url;
+                _cleanup_jsonunref_ json_variant *doc = NULL;
+                json_variant *e = NULL;
 
                 assert(!i->ancestry_job);
                 assert(!i->json_job);
@@ -670,9 +654,18 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         goto finish;
                 }
 
-                log_info("Index lookup succeeded, directed to registry %s.", i->response_registries[0]);
-                dkr_pull_report_progress(i, DKR_RESOLVING);
-                log_info("JSON:\n%s", j->payload);
+                if (0 > json_parse(j->payload, &doc)) {
+                        r = -EBADMSG;
+                        log_error("Unable to parse bearer token");
+                        goto finish;
+                }
+
+                e = json_variant_value(doc, "token");
+                log_info("Token:\n%s", json_variant_string(e));
+
+                //log_info("Index lookup succeeded, directed to registry %s.", i->response_registries[0]);
+                //dkr_pull_report_progress(i, DKR_RESOLVING);
+                //log_info("JSON:\n%s", j->payload);
                 goto finish;
 
 		// directly fetch the image manifest from the V2 registry
