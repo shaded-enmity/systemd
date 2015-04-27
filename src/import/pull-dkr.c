@@ -902,10 +902,10 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 log_info("Provenance:\n  ImageID: %s\n  Digest:  %s", json_variant_string(e), i->response_digest);
 
                 strv_free(i->ancestry);
-                i->ancestry = ancestry;
+                i->ancestry = strv_reverse(ancestry);
                 i->n_ancestry = size;
                 i->current_ancestry = 0;
-                i->id = strdup(ancestry[0]);
+                i->id = strdup(i->ancestry[0]);
                 path = strjoin(i->image_root, "/.dkr-", json_variant_string(e), NULL);
                 free(i->image_root);
                 i->image_root = path;
