@@ -633,7 +633,7 @@ static int json_scoped_parse(json_variant **tokens, size_t *i, size_t n, json_va
                 bool stopper = !json_is_value(var) && var->value.integer == terminator;
 
 		if (stopper) {
-                        if (state != STATE_COMMA) {
+                        if (state != STATE_COMMA && size > 0) {
                                 //log_info("Unexpected stopper");
                                 goto error;
                         }
