@@ -882,12 +882,14 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 r = dkr_pull_pull_layer(i);
                 if (r < 0)
                         goto finish;
-
+                goto finish;
         } else if (i->json_job != j)
                 assert_not_reached("Got finished event for unknown curl object");
 
-        if (!dkr_pull_is_done(i))
+        if (!dkr_pull_is_done(i)) {
+                log_info("undone ");
                 return;
+        }
 
         dkr_pull_report_progress(i, DKR_COPYING);
 
