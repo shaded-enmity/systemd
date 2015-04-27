@@ -92,6 +92,7 @@ struct DkrPull {
 #define USER_AGENT_V2 "User-Agent: do" /* otherwise we get load-balanced(!) to a V1 registyry */ "cker/1.6.0"
 #define BEARER_REALM "https://auth.doc" /* */ "ker.io/token"
 #define BEARER_SERVICE "registry.doc" /* */ "ker.io"
+#define VOID_LAYER "sha256:efcb65363d18569a0eb1f77f333b3cbb386ccbb44cf4f43e21e649909b329fff"
 
 #define LAYERS_MAX 2048
 
@@ -420,6 +421,22 @@ static int dkr_pull_add_token(DkrPull *i, PullJob *j) {
         return 0;
 }
 
+static int dkr_pull_add_bearer_token(DkrPull *i, PullJob *j) {
+        const char *t;
+
+        assert(i);
+        assert(j);
+
+        if (i->response_token)
+                t = strjoina("Authorization: Bearer ", i->response_token);
+
+        j->request_header = curl_slist_new(USER_AGENT_V2, "Accept: application/json", t, NULL);
+        if (!j->request_header)
+                return -ENOMEM;
+
+        return 0;
+}
+
 static bool dkr_pull_is_done(DkrPull *i) {
         assert(i);
         assert(i->images_job);
@@ -647,12 +664,6 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 assert(!i->json_job);
                 assert(!i->layer_job);
 
-                if (strv_isempty(i->response_registries)) {
-                        r = -EBADMSG;
-                        log_error("Didn't get registry information.");
-                        goto finish;
-                }
-
                 if (0 > json_parse((const char *)j->payload, &doc)) {
                         r = -EBADMSG;
                         log_error("Unable to parse bearer token");
@@ -660,10 +671,16 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 }
 
                 e = json_variant_value(doc, "token");
-                if (i->response_token) free(i->response_token);
+                if (!e || e->type != JSON_VARIANT_STRING) {
+                        r = -EBADMSG;
+                        log_error("Invalid JSON format for Bearer token");
+                        goto finish;
+                }
+
+                if (i->response_token)
+                        free(i->response_token);
                 i->response_token = strdup(json_variant_string(e));
 
-                bt = strjoina("Authorization: Bearer ", i->response_token);
                 url = strjoina(PROTOCOL_PREFIX, i->response_registries[0], "/v2/", i->name, "/manifests/", i->reference);
                 r = pull_job_new(&i->ancestry_job, url, i->glue, i);
                 if (r < 0) {
@@ -671,7 +688,13 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         goto finish;
                 }
 
-                i->ancestry_job->request_header = curl_slist_new("Accept: application/json", USER_AGENT_V2, bt, NULL);
+                r = dkr_pull_add_bearer_token(i, i->ancestry_job);
+                if (r != 0) {
+                        log_oom();
+                        goto finish;
+                }
+
+                //i->ancestry_job->request_header = curl_slist_new("Accept: application/json", USER_AGENT_V2, bt, NULL);
                 i->ancestry_job->on_finished = dkr_pull_job_on_finished_v2;
                 i->ancestry_job->on_progress = dkr_pull_job_on_progress;
 
@@ -700,6 +723,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 e = json_variant_value(doc, "fsLayers");
                 log_info("JSON Manifest v%"PRIi64" for %s parsed!", json_variant_integer(json_variant_value(doc, "schemaVersion")), json_variant_string(json_variant_value(doc, "name")));
                 log_info(" -- layers: %u", e->size);
+
                 /*
                 r = parse_ancestry(j->payload, j->payload_size, &ancestry);
                 if (r < 0) {
