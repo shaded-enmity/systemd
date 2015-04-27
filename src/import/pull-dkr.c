@@ -692,12 +692,12 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 unsigned n;
 
                 assert(!i->layer_job);
-                printf("===========================================================================================");
-                log_info("JSON(%d bytes):\n%s", j->payload_size, j->payload);
-                printf("===========================================================================================");
+                printf("===========================================================================================\n");
+                log_info("JSON(%d bytes / %d):\n%s", j->payload_size, strlen(j->payload), j->payload);
+                printf("===========================================================================================\n");
                 for (unsigned x = 0; x < j->payload_size; x++) {
                         putchar(j->payload[x]);
-                        if (j->payload[x] == 0) {
+                        if (j->payload[x] == '\0') {
                                 putchar('_');
                                 putchar('_');
                                 putchar('#');
