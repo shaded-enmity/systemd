@@ -656,7 +656,6 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
         } else if (i->tags_job == j) {
                 const char *url;
-                const char *bt;
                 _cleanup_jsonunref_ json_variant *doc = NULL;
                 json_variant *e = NULL;
 
@@ -694,7 +693,6 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         goto finish;
                 }
 
-                //i->ancestry_job->request_header = curl_slist_new("Accept: application/json", USER_AGENT_V2, bt, NULL);
                 i->ancestry_job->on_finished = dkr_pull_job_on_finished_v2;
                 i->ancestry_job->on_progress = dkr_pull_job_on_progress;
 
@@ -723,7 +721,19 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 e = json_variant_value(doc, "fsLayers");
                 log_info("JSON Manifest v%"PRIi64" for %s parsed!", json_variant_integer(json_variant_value(doc, "schemaVersion")), json_variant_string(json_variant_value(doc, "name")));
                 log_info(" -- layers: %u", e->size);
+                for (unsigned i = 0; i < e->size; i++) {
+                        json_variant *f = json_variant_element(e, i), *g = NULL;
+                        const char* layer;
+                        if (f->type != JSON_VARIANT_OBJECT) {
+                                r = -EBADMSG;
+                                goto finish;
+                        }
 
+                        g = json_variant_value(f, "blobSum");
+                        layer = json_variant_string(g);
+                        if (strcmp(layer, VOID_LAYER) != 0)
+                                log_info("%u. %s", i, layer);
+                }
                 /*
                 r = parse_ancestry(j->payload, j->payload_size, &ancestry);
                 if (r < 0) {
