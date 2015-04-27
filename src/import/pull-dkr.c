@@ -668,7 +668,6 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 i->response_token = strdup(json_variant_string(e));
 
                 bt = strjoina("Authorization: Bearer ", i->response_token);
-
                 url = strjoina(PROTOCOL_PREFIX, i->response_registries[0], "/v2/", i->name, "/manifests/", i->reference);
                 r = pull_job_new(&i->ancestry_job, url, i->glue, i);
                 if (r < 0) {
@@ -690,9 +689,11 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
                 //char **ancestry = NULL, **k;
                 unsigned n;
+                _cleanup_jsonunref_ json_variant *doc = NULL;
+                json_variant *e = NULL;
 
                 assert(!i->layer_job);
-                printf("===========================================================================================\n");
+                /*printf("===========================================================================================\n");
                 printf("JSON(%d bytes / %d):\n%s", j->payload_size, strlen(j->payload), j->payload);
                 printf("===========================================================================================\n");
                 for (unsigned x = 0; x < j->payload_size; x++) {
@@ -702,8 +703,14 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                                 putchar('_');
                                 putchar('#');
                         }
+                }*/
+                if (0 > json_parse(j->payload, &doc)) {
+                        r = -EBADMSG;
+                        log_error("Invalid JSON Manifest");
+                        goto finish;
                 }
 
+                log_info("JSON Manifest v%d for %s parsed!", json_variant_integer(json_variant_value(doc, "schemaVersion")), json_variant_string(json_variant_value(doc, "name")));
                 /*
                 r = parse_ancestry(j->payload, j->payload_size, &ancestry);
                 if (r < 0) {
