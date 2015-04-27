@@ -662,12 +662,13 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 }
 
                 e = json_variant_value(doc, "token");
-                log_info("Token:\n%s", json_variant_string(e));
-
+                //log_info("Token:\n%s", json_variant_string(e));
                 if (i->response_token) free(i->response_token);
                 i->response_token = strdup(json_variant_string(e));
 
                 bt = strjoina("Authorization: Bearer ", i->response_token);
+                log_info("%s", bt);
+
                 url = strjoina(PROTOCOL_PREFIX, i->response_registries[0], "/v2/", i->name, "/manifests/", i->reference);
                 r = pull_job_new(&i->ancestry_job, url, i->glue, i);
                 if (r < 0) {
