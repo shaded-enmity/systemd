@@ -616,7 +616,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 assert(!i->json_job);
                 assert(!i->layer_job);
 
-                slash = strchr("/", name);
+                slash = strchr(name, "/");
                 if (slash) {
                         name = slash + 1;
                 }
