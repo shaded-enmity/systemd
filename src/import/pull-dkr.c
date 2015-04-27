@@ -706,6 +706,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
                 _cleanup_jsonunref_ json_variant *doc = NULL;
                 json_variant *e = NULL;
+                _cleanup_strv_free_ char **ancestry = NULL;
+                size_t allocated, size;
 
                 assert(!i->layer_job);
                 //log_info("===========================================================================================");
@@ -719,7 +721,10 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 }
 
                 e = json_variant_value(doc, "fsLayers");
-                log_info("JSON Manifest v%"PRIi64" for %s parsed!", json_variant_integer(json_variant_value(doc, "schemaVersion")), json_variant_string(json_variant_value(doc, "name")));
+                log_info("JSON Manifest v%"PRIi64" for %s parsed!",
+                                json_variant_integer(json_variant_value(doc, "schemaVersion")),
+                                json_variant_string(json_variant_value(doc, "name")));
+
                 log_info(" -- layers: %u", e->size);
                 for (unsigned z = 0; z < e->size; z++) {
                         json_variant *f = json_variant_element(e, z), *g = NULL;
@@ -748,10 +753,22 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
                                 }
 
+                                if (!GREEDY_REALLOC(ancestry, allocated, size + 2)) {
+                                        log_oom();
+                                        goto finish;
+                                }
+
+                                ancestry[size] = strdup(value);
+                                ancestry[size+1] = NULL;
+                                size += 1;
+
                                 log_info(" -- %u. %s", z, layer);
+
                         } else
                                 log_info(" -- %u. layer is empty", z);
                 }
+
+                log_info(" - size: %"PRIu64, size);
                 /*
                 r = parse_ancestry(j->payload, j->payload_size, &ancestry);
                 if (r < 0) {
