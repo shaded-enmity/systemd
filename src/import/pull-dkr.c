@@ -905,7 +905,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 i->ancestry = ancestry;
                 i->n_ancestry = size;
                 i->current_ancestry = 0;
-                i->id = ancestry[0];
+                i->id = strdup(ancestry[0]);
                 path = strjoin(i->image_root, "/.dkr-", json_variant_string(e), NULL);
                 free(i->image_root);
                 i->image_root = path;
