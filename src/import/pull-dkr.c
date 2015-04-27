@@ -537,6 +537,66 @@ static void dkr_pull_job_on_progress(PullJob *j) {
                                                                    DKR_DOWNLOADING);
 }
 
+static int dkr_pull_pull_layer_v2(DkrPull *i) {
+        _cleanup_free_ char *path = NULL;
+        const char *url, *layer = NULL;
+        int r;
+
+        assert(i);
+        assert(!i->layer_job);
+        assert(!i->temp_path);
+        assert(!i->final_path);
+
+        for (;;) {
+                layer = dkr_pull_current_layer(i);
+                if (!layer)
+                        return 0; /* no more layers */
+
+                path = strjoin(i->image_root, "/.dkr-", layer, NULL);
+                if (!path)
+                        return log_oom();
+
+                if (laccess(path, F_OK) < 0) {
+                        if (errno == ENOENT)
+                                break;
+
+                        return log_error_errno(errno, "Failed to check for container: %m");
+                }
+
+                log_info("Layer %s already exists, skipping.", layer);
+
+                i->current_ancestry++;
+
+                free(path);
+                path = NULL;
+        }
+
+        log_info("Pulling layer %s...", layer);
+
+        i->final_path = path;
+        path = NULL;
+
+        url = strjoina(PROTOCOL_PREFIX, i->response_registries[0], "/v2/", i->name, "/blobs/", layer);
+        r = pull_job_new(&i->layer_job, url, i->glue, i);
+        if (r < 0)
+                return log_error_errno(r, "Failed to allocate layer job: %m");
+
+        r = dkr_pull_add_bearer_token(i, i->layer_job);
+        if (r < 0)
+                return log_oom();
+
+        i->layer_job->on_finished = dkr_pull_job_on_finished_v2;
+        i->layer_job->on_open_disk = dkr_pull_job_on_open_disk;
+        i->layer_job->on_progress = dkr_pull_job_on_progress;
+        i->layer_job->grow_machine_directory = i->grow_machine_directory;
+
+        r = pull_job_begin(i->layer_job);
+        if (r < 0)
+                return log_error_errno(r, "Failed to start layer job: %m");
+
+        return 0;
+}
+
 static int dkr_pull_pull_layer(DkrPull *i) {
         _cleanup_free_ char *path = NULL;
         const char *url, *layer = NULL;
@@ -710,9 +770,6 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 size_t allocated = 0, size = 0;
 
                 assert(!i->layer_job);
-                //log_info("===========================================================================================");
-                //log_info("JSON(%"PRIu64" bytes):\n%s", j->payload_size, (const char*)j->payload);
-                //log_info("===========================================================================================");
 
                 if (0 > json_parse((const char *)j->payload, &doc)) {
                         r = -EBADMSG;
@@ -725,7 +782,6 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                                 json_variant_integer(json_variant_value(doc, "schemaVersion")),
                                 json_variant_string(json_variant_value(doc, "name")));
 
-                log_info(" -- layers: %u", e->size);
                 for (unsigned z = 0; z < e->size; z++) {
                         json_variant *f = json_variant_element(e, z), *g = NULL;
                         const char* layer;
@@ -758,7 +814,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                                         goto finish;
                                 }
 
-                                ancestry[size] = strdup(value);
+                                ancestry[size] = strdup(layer);
                                 ancestry[size+1] = NULL;
                                 size += 1;
 
@@ -769,37 +825,17 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 }
 
                 log_info(" - size: %"PRIu64, size);
-                /*
-                r = parse_ancestry(j->payload, j->payload_size, &ancestry);
-                if (r < 0) {
-                        log_error_errno(r, "Failed to parse JSON id.");
-                        goto finish;
-                }
-
-                n = strv_length(ancestry);
-                if (n <= 0 || !streq(ancestry[n-1], i->id)) {
-                        log_error("Ancestry doesn't end in main layer.");
-                        strv_free(ancestry);
-                        r = -EBADMSG;
-                        goto finish;
-                }
-
-                log_info("Ancestor lookup succeeded, requires layers:\n");
-                STRV_FOREACH(k, ancestry)
-                        log_info("\t%s", *k);
-
                 strv_free(i->ancestry);
                 i->ancestry = ancestry;
-                i->n_ancestry = n;
+                i->n_ancestry = size;
                 i->current_ancestry = 0;
 
                 dkr_pull_report_progress(i, DKR_DOWNLOADING);
 
-                r = dkr_pull_pull_layer(i);
+                r = dkr_pull_pull_layer_v2(i);
                 if (r < 0)
                         goto finish;
-                */
-                goto finish;
+
         } else if (i->layer_job == j) {
                 assert(i->temp_path);
                 assert(i->final_path);
