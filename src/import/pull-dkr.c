@@ -734,7 +734,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         if (strcmp(layer, VOID_LAYER) != 0)
                                 log_info(" -- %u. %s", z, layer);
                         else
-                                log_info(" -- %u. layer is empty", z)
+                                log_info(" -- %u. layer is empty", z);
                 }
                 /*
                 r = parse_ancestry(j->payload, j->payload_size, &ancestry);
