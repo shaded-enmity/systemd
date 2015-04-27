@@ -725,7 +725,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
                 if (0 > json_parse((const char *)j->payload, &doc)) {
                         r = -EBADMSG;
-                        log_error("Unable to parse bearer token");
+                        log_error("Unable to parse bearer token\n%s", (char *)j->payload);
                         goto finish;
                 }
 
