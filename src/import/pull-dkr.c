@@ -430,7 +430,7 @@ static int dkr_pull_add_bearer_token(DkrPull *i, PullJob *j) {
         if (i->response_token) {
                 t = strjoina("Authorization: Bearer ", i->response_token);
         } else {
-                t = "NO TOKEN!"
+                t = "NO TOKEN!";
         }
 
         log_info("token: %s", i->response_token);
