@@ -608,8 +608,6 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
         if (i->images_job == j) {
                 const char *url;
-                const char *name = i->name;
-                char *slash;
 
                 assert(!i->tags_job);
                 assert(!i->ancestry_job);
@@ -625,7 +623,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 log_info("Index lookup succeeded, directed to registry %s.", i->response_registries[0]);
                 dkr_pull_report_progress(i, DKR_RESOLVING);
 
-                url = strjoina(BEARER_REALM, "?scope=", "repository:", name, ":pull", "&service=", BEARER_SERVICE);
+                url = strjoina(BEARER_REALM, "?scope=", "repository:", i->name, ":pull", "&service=", BEARER_SERVICE);
                 r = pull_job_new(&i->tags_job, url, i->glue, i);
                 if (r < 0) {
                         log_error_errno(r, "Failed to allocate tags job: %m");
@@ -688,7 +686,6 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
         } else if (i->ancestry_job == j) {
 
                 //char **ancestry = NULL, **k;
-                unsigned n;
                 _cleanup_jsonunref_ json_variant *doc = NULL;
                 json_variant *e = NULL;
 
@@ -705,7 +702,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         goto finish;
                 }
 
-                log_info("JSON Manifest v%d for %s parsed!", json_variant_integer(json_variant_value(doc, "schemaVersion")), json_variant_string(json_variant_value(doc, "name")));
+                log_info("JSON Manifest v%"PRIi64" for %s parsed!", json_variant_integer(json_variant_value(doc, "schemaVersion")), json_variant_string(json_variant_value(doc, "name")));
                 /*
                 r = parse_ancestry(j->payload, j->payload_size, &ancestry);
                 if (r < 0) {
