@@ -740,7 +740,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                                 }
 
                                 hash = strndupa(layer, hash - layer - 1);
-                                value = strndupa(layer, hash + 1);
+                                value = strdupa(hash + 1);
 
                                 log_info(" -- %u. %s [`%s`=`%s`]", z, layer, hash, value);
                         } else
