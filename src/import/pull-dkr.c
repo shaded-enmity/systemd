@@ -427,8 +427,11 @@ static int dkr_pull_add_bearer_token(DkrPull *i, PullJob *j) {
         assert(i);
         assert(j);
 
-        if (i->response_token)
+        if (i->response_token) {
                 t = strjoina("Authorization: Bearer ", i->response_token);
+        }
+
+        log_info("token: %s", i->response_token);
 
         j->request_header = curl_slist_new(USER_AGENT_V2, "Accept: application/json", t, NULL);
         if (!j->request_header)
