@@ -582,17 +582,18 @@ static int dkr_pull_pull_layer_v2(DkrPull *i) {
         i->final_path = path;
         path = NULL;
 
-        log_info("... pulling ...");
         url = strjoina(PROTOCOL_PREFIX, i->response_registries[0], "/v2/", i->name, "/blobs/", layer);
         r = pull_job_new(&i->layer_job, url, i->glue, i);
         if (r < 0)
                 return log_error_errno(r, "Failed to allocate layer job: %m");
 
-        log_info("still pulling ...");
         r = dkr_pull_add_bearer_token(i, i->layer_job);
-        if (r < 0)
+        if (r < 0) {
+                log_info("oops");
                 return log_oom();
+        }
 
+        log_info("ok, someplace else ...");
         i->layer_job->on_finished = dkr_pull_job_on_finished_v2;
         i->layer_job->on_open_disk = dkr_pull_job_on_open_disk;
         i->layer_job->on_progress = dkr_pull_job_on_progress;
@@ -730,7 +731,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 assert(!i->json_job);
                 assert(!i->layer_job);
 
-                buf = strndup(j->payload, j->payload_size);
+                buf = strndup((const char *)j->payload, j->payload_size);
 
                 if (0 > json_parse(buf, &doc)) {
                         r = -EBADMSG;
