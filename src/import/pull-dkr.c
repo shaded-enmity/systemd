@@ -427,13 +427,8 @@ static int dkr_pull_add_bearer_token(DkrPull *i, PullJob *j) {
         assert(i);
         assert(j);
 
-        if (i->response_token) {
+        if (i->response_token)
                 t = strjoina("Authorization: Bearer ", i->response_token);
-        } else {
-                t = "NO TOKEN!";
-        }
-
-        log_info("token: %s", i->response_token);
 
         j->request_header = curl_slist_new(USER_AGENT_V2, "Accept: application/json", t, NULL);
         if (!j->request_header)
@@ -588,12 +583,9 @@ static int dkr_pull_pull_layer_v2(DkrPull *i) {
                 return log_error_errno(r, "Failed to allocate layer job: %m");
 
         r = dkr_pull_add_bearer_token(i, i->layer_job);
-        if (r < 0) {
-                log_info("oops");
+        if (r < 0)
                 return log_oom();
-        }
 
-        log_info("ok, someplace else ...");
         i->layer_job->on_finished = dkr_pull_job_on_finished_v2;
         i->layer_job->on_open_disk = dkr_pull_job_on_open_disk;
         i->layer_job->on_progress = dkr_pull_job_on_progress;
@@ -887,7 +879,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 r = dkr_pull_pull_layer_v2(i);
                 if (r < 0)
                         goto finish;
-                goto finish;
+
         } else if (i->json_job != j)
                 assert_not_reached("Got finished event for unknown curl object");
 
