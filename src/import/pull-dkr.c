@@ -668,7 +668,6 @@ static int dkr_pull_job_on_header(PullJob *j, const char *header, size_t sz)  {
         assert(j->userdata);
 
         i = j->userdata;
-        printf("%s", header);
         r = curl_header_strdup(header, sz, HEADER_TOKEN, &token);
         if (r < 0)
                 return log_oom();
@@ -682,7 +681,6 @@ static int dkr_pull_job_on_header(PullJob *j, const char *header, size_t sz)  {
         if (r < 0)
                 return log_oom();
         if (r > 0) {
-                log_info("[!] DIGEST: %s", digest);
                 free(i->response_digest);
                 i->response_digest = digest;
                 return 0;
@@ -889,7 +887,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         r = -EBADMSG;
                         goto finish;
                 }
-                log_info("numcompat: %u", e->size);
+                e = json_variant_element(e, e->size - 1);
+                printf("%s", json_variant_string(e));
 
                 strv_free(i->ancestry);
                 i->ancestry = ancestry;
