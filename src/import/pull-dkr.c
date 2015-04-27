@@ -818,11 +818,10 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                                 ancestry[size+1] = NULL;
                                 size += 1;
 
-                                log_info(" -- %u. %s", size, layer);
+                                log_info(" -- %" PRIu64 ". %s", size, layer);
                         }
                 }
 
-                log_info(" - size: %"PRIu64, size);
                 strv_free(i->ancestry);
                 i->ancestry = ancestry;
                 i->n_ancestry = size;
