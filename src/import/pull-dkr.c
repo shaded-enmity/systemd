@@ -825,7 +825,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 json_variant *e = NULL;
                 _cleanup_strv_free_ char **ancestry = NULL;
                 size_t allocated = 0, size = 0;
-                char *path;
+                char *path = NULL, **k = NULL;
 
                 assert(!i->layer_job);
 
