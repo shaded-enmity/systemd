@@ -45,6 +45,8 @@
 #include "bus-error.h"
 #include "bus-util.h"
 #include "bus-kernel.h"
+#include "formats-util.h"
+#include "process-util.h"
 
 static const UnitActiveState state_translation_table[_SERVICE_STATE_MAX] = {
         [SERVICE_DEAD] = UNIT_INACTIVE,
@@ -805,8 +807,7 @@ static void service_set_state(Service *s, ServiceState state) {
         if (!IN_SET(state,
                     SERVICE_START_PRE, SERVICE_START, SERVICE_START_POST,
                     SERVICE_RELOAD,
-                    SERVICE_STOP, SERVICE_STOP_SIGTERM, SERVICE_STOP_SIGKILL,
-                    SERVICE_STOP_SIGABRT, SERVICE_STOP_POST,
+                    SERVICE_STOP, SERVICE_STOP_SIGABRT, SERVICE_STOP_SIGTERM, SERVICE_STOP_SIGKILL, SERVICE_STOP_POST,
                     SERVICE_FINAL_SIGTERM, SERVICE_FINAL_SIGKILL,
                     SERVICE_AUTO_RESTART))
                 s->timer_event_source = sd_event_source_unref(s->timer_event_source);
@@ -814,8 +815,7 @@ static void service_set_state(Service *s, ServiceState state) {
         if (!IN_SET(state,
                     SERVICE_START, SERVICE_START_POST,
                     SERVICE_RUNNING, SERVICE_RELOAD,
-                    SERVICE_STOP, SERVICE_STOP_SIGTERM, SERVICE_STOP_SIGKILL,
-                    SERVICE_STOP_SIGABRT, SERVICE_STOP_POST,
+                    SERVICE_STOP, SERVICE_STOP_SIGABRT, SERVICE_STOP_SIGTERM, SERVICE_STOP_SIGKILL, SERVICE_STOP_POST,
                     SERVICE_FINAL_SIGTERM, SERVICE_FINAL_SIGKILL)) {
                 service_unwatch_main_pid(s);
                 s->main_command = NULL;
@@ -824,8 +824,7 @@ static void service_set_state(Service *s, ServiceState state) {
         if (!IN_SET(state,
                     SERVICE_START_PRE, SERVICE_START, SERVICE_START_POST,
                     SERVICE_RELOAD,
-                    SERVICE_STOP, SERVICE_STOP_SIGTERM, SERVICE_STOP_SIGKILL,
-                    SERVICE_STOP_SIGABRT, SERVICE_STOP_POST,
+                    SERVICE_STOP, SERVICE_STOP_SIGABRT, SERVICE_STOP_SIGTERM, SERVICE_STOP_SIGKILL, SERVICE_STOP_POST,
                     SERVICE_FINAL_SIGTERM, SERVICE_FINAL_SIGKILL)) {
                 service_unwatch_control_pid(s);
                 s->control_command = NULL;
@@ -838,8 +837,8 @@ static void service_set_state(Service *s, ServiceState state) {
         if (!IN_SET(state,
                     SERVICE_START_PRE, SERVICE_START, SERVICE_START_POST,
                     SERVICE_RUNNING, SERVICE_RELOAD,
-                    SERVICE_STOP, SERVICE_STOP_SIGTERM, SERVICE_STOP_SIGKILL, SERVICE_STOP_POST,
-                    SERVICE_STOP_SIGABRT, SERVICE_FINAL_SIGTERM, SERVICE_FINAL_SIGKILL) &&
+                    SERVICE_STOP, SERVICE_STOP_SIGABRT, SERVICE_STOP_SIGTERM, SERVICE_STOP_SIGKILL, SERVICE_STOP_POST,
+                    SERVICE_FINAL_SIGTERM, SERVICE_FINAL_SIGKILL) &&
             !(state == SERVICE_DEAD && UNIT(s)->job)) {
                 service_close_socket_fd(s);
                 service_connection_unref(s);
@@ -880,7 +879,7 @@ static void service_set_state(Service *s, ServiceState state) {
         s->reload_result = SERVICE_SUCCESS;
 }
 
-static int service_coldplug(Unit *u, Hashmap *deferred_work) {
+static int service_coldplug(Unit *u) {
         Service *s = SERVICE(u);
         int r;
 
@@ -892,8 +891,7 @@ static int service_coldplug(Unit *u, Hashmap *deferred_work) {
                 if (IN_SET(s->deserialized_state,
                            SERVICE_START_PRE, SERVICE_START, SERVICE_START_POST,
                            SERVICE_RELOAD,
-                           SERVICE_STOP, SERVICE_STOP_SIGTERM, SERVICE_STOP_SIGKILL,
-                           SERVICE_STOP_SIGABRT, SERVICE_STOP_POST,
+                           SERVICE_STOP, SERVICE_STOP_SIGABRT, SERVICE_STOP_SIGTERM, SERVICE_STOP_SIGKILL, SERVICE_STOP_POST,
                            SERVICE_FINAL_SIGTERM, SERVICE_FINAL_SIGKILL)) {
 
                         usec_t k;
@@ -921,8 +919,7 @@ static int service_coldplug(Unit *u, Hashmap *deferred_work) {
                      IN_SET(s->deserialized_state,
                             SERVICE_START, SERVICE_START_POST,
                             SERVICE_RUNNING, SERVICE_RELOAD,
-                            SERVICE_STOP, SERVICE_STOP_SIGTERM, SERVICE_STOP_SIGKILL,
-                            SERVICE_STOP_SIGABRT, SERVICE_STOP_POST,
+                            SERVICE_STOP, SERVICE_STOP_SIGABRT, SERVICE_STOP_SIGTERM, SERVICE_STOP_SIGKILL, SERVICE_STOP_POST,
                             SERVICE_FINAL_SIGTERM, SERVICE_FINAL_SIGKILL))) {
                         r = unit_watch_pid(UNIT(s), s->main_pid);
                         if (r < 0)
@@ -933,8 +930,7 @@ static int service_coldplug(Unit *u, Hashmap *deferred_work) {
                     IN_SET(s->deserialized_state,
                            SERVICE_START_PRE, SERVICE_START, SERVICE_START_POST,
                            SERVICE_RELOAD,
-                           SERVICE_STOP, SERVICE_STOP_SIGTERM, SERVICE_STOP_SIGKILL,
-                           SERVICE_STOP_SIGABRT, SERVICE_STOP_POST,
+                           SERVICE_STOP, SERVICE_STOP_SIGABRT, SERVICE_STOP_SIGTERM, SERVICE_STOP_SIGKILL, SERVICE_STOP_POST,
                            SERVICE_FINAL_SIGTERM, SERVICE_FINAL_SIGKILL)) {
                         r = unit_watch_pid(UNIT(s), s->control_pid);
                         if (r < 0)
@@ -1365,6 +1361,25 @@ fail:
         service_enter_signal(s, SERVICE_FINAL_SIGTERM, SERVICE_FAILURE_RESOURCES);
 }
 
+static int state_to_kill_operation(ServiceState state) {
+        switch (state) {
+
+        case SERVICE_STOP_SIGABRT:
+                return KILL_ABORT;
+
+        case SERVICE_STOP_SIGTERM:
+        case SERVICE_FINAL_SIGTERM:
+                return KILL_TERMINATE;
+
+        case SERVICE_STOP_SIGKILL:
+        case SERVICE_FINAL_SIGKILL:
+                return KILL_KILL;
+
+        default:
+                return _KILL_OPERATION_INVALID;
+        }
+}
+
 static void service_enter_signal(Service *s, ServiceState state, ServiceResult f) {
         int r;
 
@@ -1378,8 +1393,7 @@ static void service_enter_signal(Service *s, ServiceState state, ServiceResult f
         r = unit_kill_context(
                         UNIT(s),
                         &s->kill_context,
-                        (state != SERVICE_STOP_SIGTERM && state != SERVICE_FINAL_SIGTERM && state != SERVICE_STOP_SIGABRT) ?
-                        KILL_KILL : (state == SERVICE_STOP_SIGABRT ? KILL_ABORT : KILL_TERMINATE),
+                        state_to_kill_operation(state),
                         s->main_pid,
                         s->control_pid,
                         s->main_pid_alien);
@@ -1395,11 +1409,11 @@ static void service_enter_signal(Service *s, ServiceState state, ServiceResult f
                 }
 
                 service_set_state(s, state);
-        } else if (state == SERVICE_STOP_SIGTERM || state == SERVICE_STOP_SIGABRT)
+        } else if (IN_SET(state, SERVICE_STOP_SIGABRT, SERVICE_STOP_SIGTERM) && s->kill_context.send_sigkill)
                 service_enter_signal(s, SERVICE_STOP_SIGKILL, SERVICE_SUCCESS);
-        else if (state == SERVICE_STOP_SIGKILL)
+        else if (IN_SET(state, SERVICE_STOP_SIGABRT, SERVICE_STOP_SIGTERM, SERVICE_STOP_SIGKILL))
                 service_enter_stop_post(s, SERVICE_SUCCESS);
-        else if (state == SERVICE_FINAL_SIGTERM)
+        else if (state == SERVICE_FINAL_SIGTERM && s->kill_context.send_sigkill)
                 service_enter_signal(s, SERVICE_FINAL_SIGKILL, SERVICE_SUCCESS);
         else
                 service_enter_dead(s, SERVICE_SUCCESS, true);
@@ -1409,8 +1423,7 @@ static void service_enter_signal(Service *s, ServiceState state, ServiceResult f
 fail:
         log_unit_warning_errno(UNIT(s)->id, r, "%s failed to kill processes: %m", UNIT(s)->id);
 
-        if (state == SERVICE_STOP_SIGTERM || state == SERVICE_STOP_SIGKILL ||
-            state == SERVICE_STOP_SIGABRT)
+        if (IN_SET(state, SERVICE_STOP_SIGABRT, SERVICE_STOP_SIGTERM, SERVICE_STOP_SIGKILL))
                 service_enter_stop_post(s, SERVICE_FAILURE_RESOURCES);
         else
                 service_enter_dead(s, SERVICE_FAILURE_RESOURCES, true);
@@ -1835,19 +1848,13 @@ static int service_start(Unit *u) {
 
         /* We cannot fulfill this request right now, try again later
          * please! */
-        if (s->state == SERVICE_STOP ||
-            s->state == SERVICE_STOP_SIGABRT ||
-            s->state == SERVICE_STOP_SIGTERM ||
-            s->state == SERVICE_STOP_SIGKILL ||
-            s->state == SERVICE_STOP_POST ||
-            s->state == SERVICE_FINAL_SIGTERM ||
-            s->state == SERVICE_FINAL_SIGKILL)
+        if (IN_SET(s->state,
+                   SERVICE_STOP, SERVICE_STOP_SIGABRT, SERVICE_STOP_SIGTERM, SERVICE_STOP_SIGKILL, SERVICE_STOP_POST,
+                   SERVICE_FINAL_SIGTERM, SERVICE_FINAL_SIGKILL))
                 return -EAGAIN;
 
         /* Already on it! */
-        if (s->state == SERVICE_START_PRE ||
-            s->state == SERVICE_START ||
-            s->state == SERVICE_START_POST)
+        if (IN_SET(s->state, SERVICE_START_PRE, SERVICE_START, SERVICE_START_POST))
                 return 0;
 
         /* A service that will be restarted must be stopped first to
@@ -1860,7 +1867,7 @@ static int service_start(Unit *u) {
         if (s->state == SERVICE_AUTO_RESTART)
                 return -EAGAIN;
 
-        assert(s->state == SERVICE_DEAD || s->state == SERVICE_FAILED);
+        assert(IN_SET(s->state, SERVICE_DEAD, SERVICE_FAILED));
 
         /* Make sure we don't enter a busy loop of some kind. */
         r = service_start_limit_test(s);
@@ -1895,13 +1902,9 @@ static int service_stop(Unit *u) {
         s->forbid_restart = true;
 
         /* Already on it */
-        if (s->state == SERVICE_STOP ||
-            s->state == SERVICE_STOP_SIGABRT ||
-            s->state == SERVICE_STOP_SIGTERM ||
-            s->state == SERVICE_STOP_SIGKILL ||
-            s->state == SERVICE_STOP_POST ||
-            s->state == SERVICE_FINAL_SIGTERM ||
-            s->state == SERVICE_FINAL_SIGKILL)
+        if (IN_SET(s->state,
+                   SERVICE_STOP, SERVICE_STOP_SIGABRT, SERVICE_STOP_SIGTERM, SERVICE_STOP_SIGKILL, SERVICE_STOP_POST,
+                   SERVICE_FINAL_SIGTERM, SERVICE_FINAL_SIGKILL))
                 return 0;
 
         /* A restart will be scheduled or is in progress. */
@@ -1912,16 +1915,12 @@ static int service_stop(Unit *u) {
 
         /* If there's already something running we go directly into
          * kill mode. */
-        if (s->state == SERVICE_START_PRE ||
-            s->state == SERVICE_START ||
-            s->state == SERVICE_START_POST ||
-            s->state == SERVICE_RELOAD) {
+        if (IN_SET(s->state, SERVICE_START_PRE, SERVICE_START, SERVICE_START_POST, SERVICE_RELOAD)) {
                 service_enter_signal(s, SERVICE_STOP_SIGTERM, SERVICE_SUCCESS);
                 return 0;
         }
 
-        assert(s->state == SERVICE_RUNNING ||
-               s->state == SERVICE_EXITED);
+        assert(IN_SET(s->state, SERVICE_RUNNING, SERVICE_EXITED));
 
         service_enter_stop(s, SERVICE_SUCCESS);
         return 1;
@@ -1959,8 +1958,7 @@ static int service_serialize(Unit *u, FILE *f, FDSet *fds) {
         unit_serialize_item(u, f, "reload-result", service_result_to_string(s->reload_result));
 
         if (s->control_pid > 0)
-                unit_serialize_item_format(u, f, "control-pid", PID_FMT,
-                                           s->control_pid);
+                unit_serialize_item_format(u, f, "control-pid", PID_FMT, s->control_pid);
 
         if (s->main_pid_known && s->main_pid > 0)
                 unit_serialize_item_format(u, f, "main-pid", PID_FMT, s->main_pid);
@@ -1974,8 +1972,7 @@ static int service_serialize(Unit *u, FILE *f, FDSet *fds) {
          * multiple commands attached here, we will start from the
          * first one again */
         if (s->control_command_id >= 0)
-                unit_serialize_item(u, f, "control-command",
-                                    service_exec_command_to_string(s->control_command_id));
+                unit_serialize_item(u, f, "control-command", service_exec_command_to_string(s->control_command_id));
 
         if (s->socket_fd >= 0) {
                 int copy;
@@ -2008,20 +2005,16 @@ static int service_serialize(Unit *u, FILE *f, FDSet *fds) {
         }
 
         if (s->main_exec_status.pid > 0) {
-                unit_serialize_item_format(u, f, "main-exec-status-pid", PID_FMT,
-                                           s->main_exec_status.pid);
-                dual_timestamp_serialize(f, "main-exec-status-start",
-                                         &s->main_exec_status.start_timestamp);
-                dual_timestamp_serialize(f, "main-exec-status-exit",
-                                         &s->main_exec_status.exit_timestamp);
+                unit_serialize_item_format(u, f, "main-exec-status-pid", PID_FMT, s->main_exec_status.pid);
+                dual_timestamp_serialize(f, "main-exec-status-start", &s->main_exec_status.start_timestamp);
+                dual_timestamp_serialize(f, "main-exec-status-exit", &s->main_exec_status.exit_timestamp);
 
                 if (dual_timestamp_is_set(&s->main_exec_status.exit_timestamp)) {
-                        unit_serialize_item_format(u, f, "main-exec-status-code", "%i",
-                                                   s->main_exec_status.code);
-                        unit_serialize_item_format(u, f, "main-exec-status-status", "%i",
-                                                   s->main_exec_status.status);
+                        unit_serialize_item_format(u, f, "main-exec-status-code", "%i", s->main_exec_status.code);
+                        unit_serialize_item_format(u, f, "main-exec-status-status", "%i", s->main_exec_status.status);
                 }
         }
+
         if (dual_timestamp_is_set(&s->watchdog_timestamp))
                 dual_timestamp_serialize(f, "watchdog-timestamp", &s->watchdog_timestamp);
 
@@ -2695,9 +2688,8 @@ static int service_dispatch_timer(sd_event_source *source, usec_t usec, void *us
                 break;
 
         case SERVICE_STOP_SIGABRT:
-                log_unit_warning(UNIT(s)->id,
-                                 "%s stop-sigabrt timed out. Terminating.", UNIT(s)->id);
-                service_enter_signal(s, SERVICE_STOP_SIGTERM, s->result);
+                log_unit_warning(UNIT(s)->id, "%s stop-sigabrt timed out. Terminating.", UNIT(s)->id);
+                service_enter_signal(s, SERVICE_STOP_SIGTERM, SERVICE_FAILURE_TIMEOUT);
                 break;
 
         case SERVICE_STOP_SIGTERM:

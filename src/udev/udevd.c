@@ -48,6 +48,7 @@
 #include "selinux-util.h"
 #include "udev.h"
 #include "udev-util.h"
+#include "formats-util.h"
 
 static struct udev_rules *rules;
 static struct udev_ctrl *udev_ctrl;
@@ -123,7 +124,6 @@ struct worker {
 
 /* passed from worker to main process */
 struct worker_message {
-        pid_t pid;
         int exitcode;
 };
 
@@ -255,7 +255,7 @@ static void worker_new(struct event *event) {
                         struct udev_event *udev_event;
                         struct worker_message msg;
                         int fd_lock = -1;
-                        int err = 0;
+                        int err = 0, r;
 
                         log_debug("seq %llu running", udev_device_get_seqnum(dev));
                         udev_event = udev_event_new(dev);
@@ -328,13 +328,15 @@ static void worker_new(struct event *event) {
                         udev_monitor_send_device(worker_monitor, NULL, dev);
 
 skip:
+                        log_debug("seq %llu processed with %i", udev_device_get_seqnum(dev), err);
+
                         /* send udevd the result of the event execution */
                         memzero(&msg, sizeof(struct worker_message));
                         msg.exitcode = err;
-                        msg.pid = getpid();
-                        send(worker_watch[WRITE_END], &msg, sizeof(struct worker_message), 0);
-
-                        log_debug("seq %llu processed with %i", udev_device_get_seqnum(dev), err);
+                        r = send(worker_watch[WRITE_END], &msg, sizeof(struct worker_message), 0);
+                        if (r < 0)
+                                log_error_errno(errno, "failed to send result of seq %llu to main daemon: %m",
+                                                udev_device_get_seqnum(dev));
 
                         udev_device_unref(dev);
                         dev = NULL;
@@ -598,19 +600,58 @@ static void event_queue_cleanup(struct udev *udev, enum event_state match_type) 
 static void worker_returned(int fd_worker) {
         for (;;) {
                 struct worker_message msg;
+                struct iovec iovec = {
+                        .iov_base = &msg,
+                        .iov_len = sizeof(msg),
+                };
+                union {
+                        struct cmsghdr cmsghdr;
+                        uint8_t buf[CMSG_SPACE(sizeof(struct ucred))];
+                } control = {};
+                struct msghdr msghdr = {
+                        .msg_iov = &iovec,
+                        .msg_iovlen = 1,
+                        .msg_control = &control,
+                        .msg_controllen = sizeof(control),
+                };
+                struct cmsghdr *cmsg;
                 ssize_t size;
+                struct ucred *ucred = NULL;
                 struct udev_list_node *loop;
+                bool found = false;
 
-                size = recv(fd_worker, &msg, sizeof(struct worker_message), MSG_DONTWAIT);
-                if (size != sizeof(struct worker_message))
-                        break;
+                size = recvmsg(fd_worker, &msghdr, MSG_DONTWAIT);
+                if (size < 0) {
+                        if (errno == EAGAIN || errno == EINTR)
+                                return;
+
+                        log_error_errno(errno, "failed to receive message: %m");
+                        return;
+                } else if (size != sizeof(struct worker_message)) {
+                        log_warning_errno(EIO, "ignoring worker message with invalid size %zi bytes", size);
+                        return;
+                }
+
+                for (cmsg = CMSG_FIRSTHDR(&msghdr); cmsg; cmsg = CMSG_NXTHDR(&msghdr, cmsg)) {
+                        if (cmsg->cmsg_level == SOL_SOCKET &&
+                            cmsg->cmsg_type == SCM_CREDENTIALS &&
+                            cmsg->cmsg_len == CMSG_LEN(sizeof(struct ucred)))
+                                ucred = (struct ucred*) CMSG_DATA(cmsg);
+                }
+
+                if (!ucred || ucred->pid <= 0) {
+                        log_warning_errno(EIO, "ignoring worker message without valid PID");
+                        continue;
+                }
 
                 /* lookup worker who sent the signal */
                 udev_list_node_foreach(loop, &worker_list) {
                         struct worker *worker = node_to_worker(loop);
 
-                        if (worker->pid != msg.pid)
+                        if (worker->pid != ucred->pid)
                                 continue;
+                        else
+                                found = true;
 
                         /* worker returned */
                         if (worker->event) {
@@ -623,6 +664,9 @@ static void worker_returned(int fd_worker) {
                         worker_unref(worker);
                         break;
                 }
+
+                if (!found)
+                        log_warning("unknown worker ["PID_FMT"] returned", ucred->pid);
         }
 }
 
@@ -858,6 +902,7 @@ static void handle_signal(struct udev *udev, int signo) {
                         pid_t pid;
                         int status;
                         struct udev_list_node *loop, *tmp;
+                        bool found = false;
 
                         pid = waitpid(-1, &status, WNOHANG);
                         if (pid <= 0)
@@ -868,21 +913,25 @@ static void handle_signal(struct udev *udev, int signo) {
 
                                 if (worker->pid != pid)
                                         continue;
-                                log_debug("worker ["PID_FMT"] exit", pid);
+                                else
+                                        found = true;
 
                                 if (WIFEXITED(status)) {
-                                        if (WEXITSTATUS(status) != 0)
-                                                log_error("worker ["PID_FMT"] exit with return code %i",
-                                                          pid, WEXITSTATUS(status));
+                                        if (WEXITSTATUS(status) == 0)
+                                                log_debug("worker ["PID_FMT"] exited", pid);
+                                        else
+                                                log_warning("worker ["PID_FMT"] exited with return code %i", pid, WEXITSTATUS(status));
                                 } else if (WIFSIGNALED(status)) {
-                                        log_error("worker ["PID_FMT"] terminated by signal %i (%s)",
-                                                  pid, WTERMSIG(status), strsignal(WTERMSIG(status)));
+                                        log_warning("worker ["PID_FMT"] terminated by signal %i (%s)",
+                                                    pid, WTERMSIG(status), strsignal(WTERMSIG(status)));
                                 } else if (WIFSTOPPED(status)) {
-                                        log_error("worker ["PID_FMT"] stopped", pid);
+                                        log_info("worker ["PID_FMT"] stopped", pid);
+                                        break;
                                 } else if (WIFCONTINUED(status)) {
-                                        log_error("worker ["PID_FMT"] continued", pid);
+                                        log_info("worker ["PID_FMT"] continued", pid);
+                                        break;
                                 } else {
-                                        log_error("worker ["PID_FMT"] exit with status 0x%04x", pid, status);
+                                        log_warning("worker ["PID_FMT"] exit with status 0x%04x", pid, status);
                                 }
 
                                 if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
@@ -904,6 +953,9 @@ static void handle_signal(struct udev *udev, int signo) {
                                 worker_unref(worker);
                                 break;
                         }
+
+                        if (!found)
+                                log_warning("worker ["PID_FMT"] is unknown, ignoring", pid);
                 }
                 break;
         case SIGHUP:
@@ -1123,7 +1175,7 @@ int main(int argc, char *argv[]) {
         struct epoll_event ep_netlink = { .events = EPOLLIN };
         struct epoll_event ep_worker = { .events = EPOLLIN };
         struct udev_ctrl_connection *ctrl_conn = NULL;
-        int rc = 1, r;
+        int rc = 1, r, one = 1;
 
         udev = udev_new();
         if (udev == NULL)
@@ -1318,6 +1370,10 @@ int main(int argc, char *argv[]) {
         }
         fd_worker = worker_watch[READ_END];
 
+        r = setsockopt(fd_worker, SOL_SOCKET, SO_PASSCRED, &one, sizeof(one));
+        if (r < 0)
+                return log_error_errno(errno, "could not enable SO_PASSCRED: %m");
+
         ep_ctrl.data.fd = fd_ctrl;
         ep_inotify.data.fd = fd_inotify;
         ep_signal.data.fd = fd_signal;
@@ -1504,8 +1560,21 @@ int main(int argc, char *argv[]) {
                         continue;
 
                 /* device node watch */
-                if (is_inotify)
+                if (is_inotify) {
                         handle_inotify(udev);
+
+                        /*
+                         * settle might be waiting on us to determine the queue
+                         * state. If we just handled an inotify event, we might have
+                         * generated a "change" event, but we won't have queued up
+                         * the resultant uevent yet.
+                         *
+                         * Before we go ahead and potentially tell settle that the
+                         * queue is empty, lets loop one more time to update the
+                         * queue state again before deciding.
+                         */
+                        continue;
+                }
 
                 /* tell settle that we are busy or idle, this needs to be before the
                  * PING handling

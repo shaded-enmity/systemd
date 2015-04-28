@@ -72,6 +72,9 @@
 #include "ima-setup.h"
 #include "smack-setup.h"
 #include "kmod-setup.h"
+#include "formats-util.h"
+#include "process-util.h"
+#include "terminal-util.h"
 
 static enum {
         ACTION_RUN,

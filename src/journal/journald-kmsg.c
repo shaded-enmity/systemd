@@ -31,6 +31,8 @@
 #include "journald-server.h"
 #include "journald-kmsg.h"
 #include "journald-syslog.h"
+#include "formats-util.h"
+#include "process-util.h"
 
 void server_forward_kmsg(
         Server *s,

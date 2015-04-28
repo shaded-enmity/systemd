@@ -52,6 +52,7 @@
 #include <blkid/blkid.h>
 #endif
 
+#include "random-util.h"
 #include "sd-daemon.h"
 #include "sd-bus.h"
 #include "sd-id128.h"
@@ -91,6 +92,9 @@
 #include "in-addr-util.h"
 #include "fw-util.h"
 #include "local-addresses.h"
+#include "formats-util.h"
+#include "process-util.h"
+#include "terminal-util.h"
 
 #ifdef HAVE_SECCOMP
 #include "seccomp-util.h"
@@ -2135,11 +2139,12 @@ static int reset_audit_loginuid(void) {
 
         r = write_string_file("/proc/self/loginuid", "4294967295");
         if (r < 0) {
-                log_error("Failed to reset audit login UID. This probably means that your kernel is too\n"
-                          "old and you have audit enabled. Note that the auditing subsystem is known to\n"
-                          "be incompatible with containers on old kernels. Please make sure to upgrade\n"
-                          "your kernel or to off auditing with 'audit=0' on the kernel command line before\n"
-                          "using systemd-nspawn. Sleeping for 5s... (%s)\n", strerror(-r));
+                log_error_errno(r,
+                                "Failed to reset audit login UID. This probably means that your kernel is too\n"
+                                "old and you have audit enabled. Note that the auditing subsystem is known to\n"
+                                "be incompatible with containers on old kernels. Please make sure to upgrade\n"
+                                "your kernel or to off auditing with 'audit=0' on the kernel command line before\n"
+                                "using systemd-nspawn. Sleeping for 5s... (%m)");
 
                 sleep(5);
         }
@@ -3602,7 +3607,8 @@ static int determine_names(void) {
                         if (r < 0)
                                 return log_error_errno(r, "Invalid image directory: %m");
 
-                        arg_read_only = arg_read_only || i->read_only;
+                        if (!arg_ephemeral)
+                                arg_read_only = arg_read_only || i->read_only;
                 } else
                         arg_directory = get_current_dir_name();
 

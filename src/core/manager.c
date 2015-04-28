@@ -71,6 +71,8 @@
 #include "dbus-manager.h"
 #include "bus-kernel.h"
 #include "time-util.h"
+#include "process-util.h"
+#include "terminal-util.h"
 
 /* Initial delay and the interval for printing status messages about running jobs */
 #define JOBS_IN_PROGRESS_WAIT_USEC (5*USEC_PER_SEC)
@@ -973,59 +975,25 @@ int manager_enumerate(Manager *m) {
         return r;
 }
 
-static int manager_coldplug(Manager *m) {
-        int r = 0;
+static void manager_coldplug(Manager *m) {
         Iterator i;
         Unit *u;
         char *k;
-
-        /*
-         * Some unit types tend to spawn jobs or check other units' state
-         * during coldplug. This is wrong because it is undefined whether the
-         * units in question have been already coldplugged (i. e. their state
-         * restored). This way, we can easily re-start an already started unit
-         * or otherwise make a wrong decision based on the unit's state.
-         *
-         * Solve this by providing a way for coldplug functions to defer
-         * such actions until after all units have been coldplugged.
-         *
-         * We store Unit* -> int(*)(Unit*).
-         *
-         * https://bugs.freedesktop.org/show_bug.cgi?id=88401
-         */
-        _cleanup_hashmap_free_ Hashmap *deferred_work = NULL;
-        int(*proc)(Unit*);
+        int r;
 
         assert(m);
 
-        deferred_work = hashmap_new(&trivial_hash_ops);
-        if (!deferred_work)
-                return -ENOMEM;
-
         /* Then, let's set up their initial state. */
         HASHMAP_FOREACH_KEY(u, k, m->units, i) {
-                int q;
 
                 /* ignore aliases */
                 if (u->id != k)
                         continue;
 
-                q = unit_coldplug(u, deferred_work);
-                if (q < 0)
-                        r = q;
+                r = unit_coldplug(u);
+                if (r < 0)
+                        log_warning_errno(r, "We couldn't coldplug %s, proceeding anyway: %m", u->id);
         }
-
-        /* After coldplugging and setting up initial state of the units,
-         * let's perform operations which spawn jobs or query units' state. */
-        HASHMAP_FOREACH_KEY(proc, u, deferred_work, i) {
-                int q;
-
-                q = proc(u);
-                if (q < 0)
-                        r = q;
-        }
-
-        return r;
 }
 
 static void manager_build_unit_path_cache(Manager *m) {
@@ -1169,9 +1137,7 @@ int manager_startup(Manager *m, FILE *serialization, FDSet *fds) {
         bus_track_coldplug(m, &m->subscribed, &m->deserialized_subscribed);
 
         /* Third, fire things up! */
-        q = manager_coldplug(m);
-        if (q < 0 && r == 0)
-                r = q;
+        manager_coldplug(m);
 
         if (serialization) {
                 assert(m->n_reloading > 0);
@@ -2589,9 +2555,7 @@ int manager_reload(Manager *m) {
                 r = q;
 
         /* Third, fire things up! */
-        q = manager_coldplug(m);
-        if (q < 0 && r >= 0)
-                r = q;
+        manager_coldplug(m);
 
         assert(m->n_reloading > 0);
         m->n_reloading--;

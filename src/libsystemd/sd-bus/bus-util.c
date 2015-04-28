@@ -30,9 +30,11 @@
 #include "path-util.h"
 #include "missing.h"
 #include "set.h"
+#include "unit-name.h"
 
 #include "sd-bus.h"
 #include "bus-error.h"
+#include "bus-label.h"
 #include "bus-message.h"
 #include "bus-util.h"
 #include "bus-internal.h"
@@ -203,6 +205,9 @@ static int check_good_user(sd_bus_message *m, uid_t good_user) {
         r = sd_bus_query_sender_creds(m, SD_BUS_CREDS_EUID, &creds);
         if (r < 0)
                 return r;
+
+        /* Don't trust augmented credentials for authorization */
+        assert_return((sd_bus_creds_get_augmented_mask(creds) & SD_BUS_CREDS_EUID) == 0, -EPERM);
 
         r = sd_bus_creds_get_euid(creds, &sender_uid);
         if (r < 0)
@@ -713,6 +718,18 @@ int bus_print_property(const char *name, sd_bus_message *property, bool all) {
                         printf("%s=%s\n", name, format_timespan(timespan, sizeof(timespan), u, 0));
                 } else
                         printf("%s=%llu\n", name, (unsigned long long) u);
+
+                return 1;
+        }
+
+        case SD_BUS_TYPE_INT64: {
+                int64_t i;
+
+                r = sd_bus_message_read_basic(property, type, &i);
+                if (r < 0)
+                        return r;
+
+                printf("%s=%lld\n", name, (long long) i);
 
                 return 1;
         }
@@ -1708,6 +1725,73 @@ static int bus_process_wait(sd_bus *bus) {
         }
 }
 
+static int bus_job_get_service_result(BusWaitForJobs *d, char **result) {
+        _cleanup_free_ char *dbus_path = NULL;
+
+        assert(d);
+        assert(d->name);
+        assert(result);
+
+        dbus_path = unit_dbus_path_from_name(d->name);
+        if (!dbus_path)
+                return -ENOMEM;
+
+        return sd_bus_get_property_string(d->bus,
+                                          "org.freedesktop.systemd1",
+                                          dbus_path,
+                                          "org.freedesktop.systemd1.Service",
+                                          "Result",
+                                          NULL,
+                                          result);
+}
+
+static const struct {
+        const char *result, *explanation;
+} explanations [] = {
+        { "resources",   "a configured resource limit was exceeded" },
+        { "timeout",     "a timeout was exceeded" },
+        { "exit-code",   "the control process exited with error code" },
+        { "signal",      "a fatal signal was delivered to the control process" },
+        { "core-dump",   "a fatal signal was delivered causing the control process to dump core" },
+        { "watchdog",    "the service failed to send watchdog ping" },
+        { "start-limit", "start of the service was attempted too often" }
+};
+
+static void log_job_error_with_service_result(const char* service, const char *result) {
+        _cleanup_free_ char *service_shell_quoted = NULL;
+
+        assert(service);
+
+        service_shell_quoted = shell_maybe_quote(service);
+
+        if (!isempty(result)) {
+                unsigned i;
+
+                for (i = 0; i < ELEMENTSOF(explanations); ++i)
+                        if (streq(result, explanations[i].result))
+                                break;
+
+                if (i < ELEMENTSOF(explanations)) {
+                        log_error("Job for %s failed because %s. See \"systemctl status %s\" and \"journalctl -xe\" for details.\n",
+                                  service,
+                                  explanations[i].explanation,
+                                  strna(service_shell_quoted));
+
+                        goto finish;
+                }
+        }
+
+        log_error("Job for %s failed. See \"systemctl status %s\" and \"journalctl -xe\" for details.\n",
+                  service,
+                  strna(service_shell_quoted));
+
+finish:
+        /* For some results maybe additional explanation is required */
+        if (streq_ptr(result, "start-limit"))
+                log_info("To force a start use \"systemctl reset-failed %1$s\" followed by \"systemctl start %1$s\" again.",
+                         strna(service_shell_quoted));
+}
+
 static int check_wait_response(BusWaitForJobs *d, bool quiet) {
         int r = 0;
 
@@ -1727,15 +1811,17 @@ static int check_wait_response(BusWaitForJobs *d, bool quiet) {
                 else if (streq(d->result, "unsupported"))
                         log_error("Operation on or unit type of %s not supported on this system.", strna(d->name));
                 else if (!streq(d->result, "done") && !streq(d->result, "skipped")) {
-                        _cleanup_free_ char *quoted = NULL;
+                        if (d->name) {
+                                int q;
+                                _cleanup_free_ char *result = NULL;
 
-                        if (d->name)
-                                quoted = shell_maybe_quote(d->name);
+                                q = bus_job_get_service_result(d, &result);
+                                if (q < 0)
+                                        log_debug_errno(q, "Failed to get Result property of service %s: %m", d->name);
 
-                        if (quoted)
-                                log_error("Job for %s failed. See 'systemctl status %s' and 'journalctl -xe' for details.", d->name, quoted);
-                        else
-                                log_error("Job failed. See 'journalctl -xe' for details.");
+                                log_job_error_with_service_result(d->name, result);
+                        } else
+                                log_error("Job failed. See \"journalctl -xe\" for details.");
                 }
         }
 
@@ -1801,6 +1887,16 @@ int bus_wait_for_jobs_add(BusWaitForJobs *d, const char *path) {
         return set_put_strdup(d->jobs, path);
 }
 
+int bus_wait_for_jobs_one(BusWaitForJobs *d, const char *path, bool quiet) {
+        int r;
+
+        r = bus_wait_for_jobs_add(d, path);
+        if (r < 0)
+                return log_oom();
+
+        return bus_wait_for_jobs(d, quiet);
+}
+
 int bus_deserialize_and_dump_unit_file_changes(sd_bus_message *m, bool quiet) {
         const char *type, *path, *source;
         int r;
@@ -1825,4 +1921,131 @@ int bus_deserialize_and_dump_unit_file_changes(sd_bus_message *m, bool quiet) {
                 return bus_log_parse_error(r);
 
         return 0;
+}
+
+/**
+ * bus_path_encode_unique() - encode unique object path
+ * @b: bus connection or NULL
+ * @prefix: object path prefix
+ * @sender_id: unique-name of client, or NULL
+ * @external_id: external ID to be chosen by client, or NULL
+ * @ret_path: storage for encoded object path pointer
+ *
+ * Whenever we provide a bus API that allows clients to create and manage
+ * server-side objects, we need to provide a unique name for these objects. If
+ * we let the server choose the name, we suffer from a race condition: If a
+ * client creates an object asynchronously, it cannot destroy that object until
+ * it received the method reply. It cannot know the name of the new object,
+ * thus, it cannot destroy it. Furthermore, it enforces a round-trip.
+ *
+ * Therefore, many APIs allow the client to choose the unique name for newly
+ * created objects. There're two problems to solve, though:
+ *    1) Object names are usually defined via dbus object paths, which are
+ *       usually globally namespaced. Therefore, multiple clients must be able
+ *       to choose unique object names without interference.
+ *    2) If multiple libraries share the same bus connection, they must be
+ *       able to choose unique object names without interference.
+ * The first problem is solved easily by prefixing a name with the
+ * unique-bus-name of a connection. The server side must enforce this and
+ * reject any other name. The second problem is solved by providing unique
+ * suffixes from within sd-bus.
+ *
+ * This helper allows clients to create unique object-paths. It uses the
+ * template '/prefix/sender_id/external_id' and returns the new path in
+ * @ret_path (must be freed by the caller).
+ * If @sender_id is NULL, the unique-name of @b is used. If @external_id is
+ * NULL, this function allocates a unique suffix via @b (by requesting a new
+ * cookie). If both @sender_id and @external_id are given, @b can be passed as
+ * NULL.
+ *
+ * Returns: 0 on success, negative error code on failure.
+ */
+int bus_path_encode_unique(sd_bus *b, const char *prefix, const char *sender_id, const char *external_id, char **ret_path) {
+        _cleanup_free_ char *sender_label = NULL, *external_label = NULL;
+        char external_buf[DECIMAL_STR_MAX(uint64_t)], *p;
+        int r;
+
+        assert_return(b || (sender_id && external_id), -EINVAL);
+        assert_return(object_path_is_valid(prefix), -EINVAL);
+        assert_return(ret_path, -EINVAL);
+
+        if (!sender_id) {
+                r = sd_bus_get_unique_name(b, &sender_id);
+                if (r < 0)
+                        return r;
+        }
+
+        if (!external_id) {
+                xsprintf(external_buf, "%"PRIu64, ++b->cookie);
+                external_id = external_buf;
+        }
+
+        sender_label = bus_label_escape(sender_id);
+        if (!sender_label)
+                return -ENOMEM;
+
+        external_label = bus_label_escape(external_id);
+        if (!external_label)
+                return -ENOMEM;
+
+        p = strjoin(prefix, "/", sender_label, "/", external_label, NULL);
+        if (!p)
+                return -ENOMEM;
+
+        *ret_path = p;
+        return 0;
+}
+
+/**
+ * bus_path_decode_unique() - decode unique object path
+ * @path: object path to decode
+ * @prefix: object path prefix
+ * @ret_sender: output parameter for sender-id label
+ * @ret_external: output parameter for external-id label
+ *
+ * This does the reverse of bus_path_encode_unique() (see its description for
+ * details). Both trailing labels, sender-id and external-id, are unescaped and
+ * returned in the given output parameters (the caller must free them).
+ *
+ * Note that this function returns 0 if the path does not match the template
+ * (see bus_path_encode_unique()), 1 if it matched.
+ *
+ * Returns: Negative error code on failure, 0 if the given object path does not
+ *          match the template (return parameters are set to NULL), 1 if it was
+ *          parsed successfully (return parameters contain allocated labels).
+ */
+int bus_path_decode_unique(const char *path, const char *prefix, char **ret_sender, char **ret_external) {
+        const char *p, *q;
+        char *sender, *external;
+
+        assert(object_path_is_valid(path));
+        assert(object_path_is_valid(prefix));
+        assert(ret_sender);
+        assert(ret_external);
+
+        p = object_path_startswith(path, prefix);
+        if (!p) {
+                *ret_sender = NULL;
+                *ret_external = NULL;
+                return 0;
+        }
+
+        q = strchr(p, '/');
+        if (!q) {
+                *ret_sender = NULL;
+                *ret_external = NULL;
+                return 0;
+        }
+
+        sender = bus_label_unescape_n(p, q - p);
+        external = bus_label_unescape(q + 1);
+        if (!sender || !external) {
+                free(sender);
+                free(external);
+                return -ENOMEM;
+        }
+
+        *ret_sender = sender;
+        *ret_external = external;
+        return 1;
 }

@@ -52,6 +52,8 @@ typedef enum KillOperation {
         KILL_TERMINATE,
         KILL_KILL,
         KILL_ABORT,
+        _KILL_OPERATION_MAX,
+        _KILL_OPERATION_INVALID = -1
 } KillOperation;
 
 static inline bool UNIT_IS_ACTIVE_OR_RELOADING(UnitActiveState t) {
@@ -102,6 +104,7 @@ struct Unit {
         char *fragment_path; /* if loaded from a config file this is the primary path to it */
         char *source_path; /* if converted, the source file */
         char **dropin_paths;
+
         usec_t fragment_mtime;
         usec_t source_mtime;
         usec_t dropin_mtime;
@@ -231,6 +234,9 @@ struct Unit {
         bool cgroup_realized:1;
         bool cgroup_members_mask_valid:1;
         bool cgroup_subtree_mask_valid:1;
+
+        /* Did we already invoke unit_coldplug() for this unit? */
+        bool coldplugged;
 };
 
 struct UnitStatusMessageFormats {
@@ -301,14 +307,8 @@ struct UnitVTable {
         int (*load)(Unit *u);
 
         /* If a lot of units got created via enumerate(), this is
-         * where to actually set the state and call unit_notify().
-         *
-         * This must not reference other units (maybe implicitly through spawning
-         * jobs), because it is possible that they are not yet coldplugged.
-         * Such actions must be deferred until the end of coldplug bу adding
-         * a "Unit* -> int(*)(Unit*)" entry into the hashmap.
-         */
-        int (*coldplug)(Unit *u, Hashmap *deferred_work);
+         * where to actually set the state and call unit_notify(). */
+        int (*coldplug)(Unit *u);
 
         void (*dump)(Unit *u, FILE *f, const char *prefix);
 
@@ -544,7 +544,7 @@ int unit_deserialize(Unit *u, FILE *f, FDSet *fds);
 
 int unit_add_node_link(Unit *u, const char *what, bool wants);
 
-int unit_coldplug(Unit *u, Hashmap *deferred_work);
+int unit_coldplug(Unit *u);
 
 void unit_status_printf(Unit *u, const char *status, const char *unit_status_msg_format) _printf_(3, 0);
 

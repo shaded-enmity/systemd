@@ -25,6 +25,7 @@
 #include "bus-common-errors.h"
 #include "bus-error.h"
 #include "transaction.h"
+#include "terminal-util.h"
 
 static void transaction_unlink_job(Transaction *tr, Job *j, bool delete_dependencies);
 
@@ -846,6 +847,13 @@ int transaction_add_job_and_dependencies(
         assert(type < _JOB_TYPE_MAX);
         assert(type < _JOB_TYPE_MAX_IN_TRANSACTION);
         assert(unit);
+
+        /* Before adding jobs for this unit, let's ensure that its state has been loaded
+         * This matters when jobs are spawned as part of coldplugging itself (see e. g. path_coldplug()).
+         * This way, we "recursively" coldplug units, ensuring that we do not look at state of
+         * not-yet-coldplugged units. */
+        if (unit->manager->n_reloading > 0)
+                unit_coldplug(unit);
 
         /* log_debug("Pulling in %s/%s from %s/%s", */
         /*           unit->id, job_type_to_string(type), */

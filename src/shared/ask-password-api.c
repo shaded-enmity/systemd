@@ -32,8 +32,11 @@
 #include <sys/signalfd.h>
 
 #include "util.h"
+#include "formats-util.h"
 #include "mkdir.h"
 #include "strv.h"
+#include "random-util.h"
+#include "terminal-util.h"
 
 #include "ask-password-api.h"
 

@@ -32,6 +32,7 @@
 #include "libudev-private.h"
 #include "socket-util.h"
 #include "missing.h"
+#include "formats-util.h"
 
 /**
  * SECTION:libudev-monitor
@@ -758,13 +759,13 @@ int udev_monitor_send_device(struct udev_monitor *udev_monitor,
         count = sendmsg(udev_monitor->sock, &smsg, 0);
         if (count < 0) {
                 if (!destination && errno == ECONNREFUSED) {
-                        log_debug("passed unknown number of bytes to netlink monitor %p", udev_monitor);
+                        log_debug("passed device to to netlink monitor %p", udev_monitor);
                         return 0;
                 } else
                         return -errno;
         }
 
-        log_debug("passed %zi bytes to netlink monitor %p", count, udev_monitor);
+        log_debug("passed %zi byte device to netlink monitor %p", count, udev_monitor);
         return count;
 }
 

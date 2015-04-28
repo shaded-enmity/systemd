@@ -48,6 +48,7 @@
 #include "dbus-socket.h"
 #include "unit.h"
 #include "socket.h"
+#include "formats-util.h"
 
 static const UnitActiveState state_translation_table[_SOCKET_STATE_MAX] = {
         [SOCKET_DEAD] = UNIT_INACTIVE,
@@ -1322,7 +1323,7 @@ static void socket_set_state(Socket *s, SocketState state) {
         unit_notify(UNIT(s), state_translation_table[old_state], state_translation_table[state], true);
 }
 
-static int socket_coldplug(Unit *u, Hashmap *deferred_work) {
+static int socket_coldplug(Unit *u) {
         Socket *s = SOCKET(u);
         int r;
 

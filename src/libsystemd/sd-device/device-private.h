@@ -37,7 +37,7 @@ void device_set_is_initialized(sd_device *device);
 void device_set_watch_handle(sd_device *device, int fd);
 void device_set_db_persist(sd_device *device);
 void device_set_devlink_priority(sd_device *device, int priority);
-int device_ensure_usec_initialized(sd_device *devcie, sd_device *device_old);
+int device_ensure_usec_initialized(sd_device *device, sd_device *device_old);
 int device_add_devlink(sd_device *device, const char *devlink);
 int device_add_property(sd_device *device, const char *property, const char *value);
 int device_add_tag(sd_device *device, const char *tag);
@@ -61,3 +61,4 @@ int device_new_from_synthetic_event(sd_device **new_device, const char *syspath,
 int device_tag_index(sd_device *dev, sd_device *dev_old, bool add);
 int device_update_db(sd_device *device);
 int device_delete_db(sd_device *device);
+int device_read_db_force(sd_device *device);

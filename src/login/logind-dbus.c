@@ -40,6 +40,10 @@
 #include "selinux-util.h"
 #include "efivars.h"
 #include "logind.h"
+#include "formats-util.h"
+#include "process-util.h"
+#include "terminal-util.h"
+#include "utmp-wtmp.h"
 
 int manager_get_session_from_creds(Manager *m, sd_bus_message *message, const char *name, sd_bus_error *error, Session **ret) {
         _cleanup_bus_creds_unref_ sd_bus_creds *creds = NULL;
@@ -208,6 +212,33 @@ static int property_get_preparing(
                 b = !!(m->action_what & INHIBIT_SLEEP);
 
         return sd_bus_message_append(reply, "b", b);
+}
+
+static int property_get_scheduled_shutdown(
+                sd_bus *bus,
+                const char *path,
+                const char *interface,
+                const char *property,
+                sd_bus_message *reply,
+                void *userdata,
+                sd_bus_error *error) {
+
+        Manager *m = userdata;
+        int r;
+
+        assert(bus);
+        assert(reply);
+        assert(m);
+
+        r = sd_bus_message_open_container(reply, 'r', "st");
+        if (r < 0)
+                return r;
+
+        r = sd_bus_message_append(reply, "st", m->scheduled_shutdown_type, m->scheduled_shutdown_timeout);
+        if (r < 0)
+                return r;
+
+        return sd_bus_message_close_container(reply);
 }
 
 static BUS_DEFINE_PROPERTY_GET_ENUM(property_get_handle_action, handle_action, HandleAction);
@@ -1456,17 +1487,75 @@ static int execute_shutdown_or_sleep(
         return 0;
 }
 
+static int manager_inhibit_timeout_handler(
+                        sd_event_source *s,
+                        uint64_t usec,
+                        void *userdata) {
+
+        _cleanup_bus_error_free_ sd_bus_error error = SD_BUS_ERROR_NULL;
+        Inhibitor *offending = NULL;
+        Manager *manager = userdata;
+        int r;
+
+        assert(manager);
+        assert(manager->inhibit_timeout_source == s);
+
+        if (manager->action_what == 0 || manager->action_job)
+                return 0;
+
+        if (manager_is_inhibited(manager, manager->action_what, INHIBIT_DELAY, NULL, false, false, 0, &offending)) {
+                _cleanup_free_ char *comm = NULL, *u = NULL;
+
+                (void) get_process_comm(offending->pid, &comm);
+                u = uid_to_name(offending->uid);
+
+                log_notice("Delay lock is active (UID "UID_FMT"/%s, PID "PID_FMT"/%s) but inhibitor timeout is reached.",
+                           offending->uid, strna(u),
+                           offending->pid, strna(comm));
+        }
+
+        /* Actually do the operation */
+        r = execute_shutdown_or_sleep(manager, manager->action_what, manager->action_unit, &error);
+        if (r < 0) {
+                log_warning("Failed to send delayed message: %s", bus_error_message(&error, r));
+
+                manager->action_unit = NULL;
+                manager->action_what = 0;
+        }
+
+        return 0;
+}
+
 static int delay_shutdown_or_sleep(
                 Manager *m,
                 InhibitWhat w,
                 const char *unit_name) {
+
+        int r;
+        usec_t timeout_val;
 
         assert(m);
         assert(w >= 0);
         assert(w < _INHIBIT_WHAT_MAX);
         assert(unit_name);
 
-        m->action_timestamp = now(CLOCK_MONOTONIC);
+        timeout_val = now(CLOCK_MONOTONIC) + m->inhibit_delay_max;
+
+        if (m->inhibit_timeout_source) {
+                r = sd_event_source_set_time(m->inhibit_timeout_source, timeout_val);
+                if (r < 0)
+                        return log_error_errno(r, "sd_event_source_set_time() failed: %m");
+
+                r = sd_event_source_set_enabled(m->inhibit_timeout_source, SD_EVENT_ONESHOT);
+                if (r < 0)
+                        return log_error_errno(r, "sd_event_source_set_enabled() failed: %m");
+        } else {
+                r = sd_event_add_time(m->event, &m->inhibit_timeout_source, CLOCK_MONOTONIC,
+                                      timeout_val, 0, manager_inhibit_timeout_handler, m);
+                if (r < 0)
+                        return r;
+        }
+
         m->action_unit = unit_name;
         m->action_what = w;
 
@@ -1529,6 +1618,68 @@ int bus_manager_shutdown_or_sleep_now_or_later(
         return r;
 }
 
+static int verify_shutdown_creds(
+                Manager *m,
+                sd_bus_message *message,
+                InhibitWhat w,
+                bool interactive,
+                const char *action,
+                const char *action_multiple_sessions,
+                const char *action_ignore_inhibit,
+                sd_bus_error *error) {
+
+        _cleanup_bus_creds_unref_ sd_bus_creds *creds = NULL;
+        bool multiple_sessions, blocked;
+        uid_t uid;
+        int r;
+
+        assert(m);
+        assert(message);
+        assert(w >= 0);
+        assert(w <= _INHIBIT_WHAT_MAX);
+
+        r = sd_bus_query_sender_creds(message, SD_BUS_CREDS_EUID, &creds);
+        if (r < 0)
+                return r;
+
+        r = sd_bus_creds_get_euid(creds, &uid);
+        if (r < 0)
+                return r;
+
+        r = have_multiple_sessions(m, uid);
+        if (r < 0)
+                return r;
+
+        multiple_sessions = r > 0;
+        blocked = manager_is_inhibited(m, w, INHIBIT_BLOCK, NULL, false, true, uid, NULL);
+
+        if (multiple_sessions && action_multiple_sessions) {
+                r = bus_verify_polkit_async(message, CAP_SYS_BOOT, action_multiple_sessions, interactive, UID_INVALID, &m->polkit_registry, error);
+                if (r < 0)
+                        return r;
+                if (r == 0)
+                        return 1; /* No authorization for now, but the async polkit stuff will call us again when it has it */
+        }
+
+        if (blocked && action_ignore_inhibit) {
+                r = bus_verify_polkit_async(message, CAP_SYS_BOOT, action_ignore_inhibit, interactive, UID_INVALID, &m->polkit_registry, error);
+                if (r < 0)
+                        return r;
+                if (r == 0)
+                        return 1; /* No authorization for now, but the async polkit stuff will call us again when it has it */
+        }
+
+        if (!multiple_sessions && !blocked && action) {
+                r = bus_verify_polkit_async(message, CAP_SYS_BOOT, action, interactive, UID_INVALID, &m->polkit_registry, error);
+                if (r < 0)
+                        return r;
+                if (r == 0)
+                        return 1; /* No authorization for now, but the async polkit stuff will call us again when it has it */
+        }
+
+        return 0;
+}
+
 static int method_do_shutdown_or_sleep(
                 Manager *m,
                 sd_bus_message *message,
@@ -1538,23 +1689,15 @@ static int method_do_shutdown_or_sleep(
                 const char *action_multiple_sessions,
                 const char *action_ignore_inhibit,
                 const char *sleep_verb,
-                sd_bus_message_handler_t method,
                 sd_bus_error *error) {
 
-        _cleanup_bus_creds_unref_ sd_bus_creds *creds = NULL;
-        bool multiple_sessions, blocked;
         int interactive, r;
-        uid_t uid;
 
         assert(m);
         assert(message);
         assert(unit_name);
         assert(w >= 0);
         assert(w <= _INHIBIT_WHAT_MAX);
-        assert(action);
-        assert(action_multiple_sessions);
-        assert(action_ignore_inhibit);
-        assert(method);
 
         r = sd_bus_message_read(message, "b", &interactive);
         if (r < 0)
@@ -1573,44 +1716,10 @@ static int method_do_shutdown_or_sleep(
                         return sd_bus_error_setf(error, BUS_ERROR_SLEEP_VERB_NOT_SUPPORTED, "Sleep verb not supported");
         }
 
-        r = sd_bus_query_sender_creds(message, SD_BUS_CREDS_EUID, &creds);
-        if (r < 0)
+        r = verify_shutdown_creds(m, message, w, interactive, action, action_multiple_sessions,
+                                  action_ignore_inhibit, error);
+        if (r != 0)
                 return r;
-
-        r = sd_bus_creds_get_euid(creds, &uid);
-        if (r < 0)
-                return r;
-
-        r = have_multiple_sessions(m, uid);
-        if (r < 0)
-                return r;
-
-        multiple_sessions = r > 0;
-        blocked = manager_is_inhibited(m, w, INHIBIT_BLOCK, NULL, false, true, uid, NULL);
-
-        if (multiple_sessions) {
-                r = bus_verify_polkit_async(message, CAP_SYS_BOOT, action_multiple_sessions, interactive, UID_INVALID, &m->polkit_registry, error);
-                if (r < 0)
-                        return r;
-                if (r == 0)
-                        return 1; /* No authorization for now, but the async polkit stuff will call us again when it has it */
-        }
-
-        if (blocked) {
-                r = bus_verify_polkit_async(message, CAP_SYS_BOOT, action_ignore_inhibit, interactive, UID_INVALID, &m->polkit_registry, error);
-                if (r < 0)
-                        return r;
-                if (r == 0)
-                        return 1; /* No authorization for now, but the async polkit stuff will call us again when it has it */
-        }
-
-        if (!multiple_sessions && !blocked) {
-                r = bus_verify_polkit_async(message, CAP_SYS_BOOT, action, interactive, UID_INVALID, &m->polkit_registry, error);
-                if (r < 0)
-                        return r;
-                if (r == 0)
-                        return 1; /* No authorization for now, but the async polkit stuff will call us again when it has it */
-        }
 
         r = bus_manager_shutdown_or_sleep_now_or_later(m, unit_name, w, error);
         if (r < 0)
@@ -1630,7 +1739,6 @@ static int method_poweroff(sd_bus *bus, sd_bus_message *message, void *userdata,
                         "org.freedesktop.login1.power-off-multiple-sessions",
                         "org.freedesktop.login1.power-off-ignore-inhibit",
                         NULL,
-                        method_poweroff,
                         error);
 }
 
@@ -1645,7 +1753,6 @@ static int method_reboot(sd_bus *bus, sd_bus_message *message, void *userdata, s
                         "org.freedesktop.login1.reboot-multiple-sessions",
                         "org.freedesktop.login1.reboot-ignore-inhibit",
                         NULL,
-                        method_reboot,
                         error);
 }
 
@@ -1660,8 +1767,239 @@ static int method_suspend(sd_bus *bus, sd_bus_message *message, void *userdata, 
                         "org.freedesktop.login1.suspend-multiple-sessions",
                         "org.freedesktop.login1.suspend-ignore-inhibit",
                         "suspend",
-                        method_suspend,
                         error);
+}
+
+static int nologin_timeout_handler(
+                        sd_event_source *s,
+                        uint64_t usec,
+                        void *userdata) {
+
+        Manager *m = userdata;
+        int r;
+
+        log_info("Creating /run/nologin, blocking further logins...");
+
+        r = write_string_file_atomic("/run/nologin", "System is going down.");
+        if (r < 0)
+                log_error_errno(r, "Failed to create /run/nologin: %m");
+        else
+                m->unlink_nologin = true;
+
+        return 0;
+}
+
+static int update_schedule_file(Manager *m) {
+
+        int r;
+        _cleanup_fclose_ FILE *f = NULL;
+        _cleanup_free_ char *t = NULL, *temp_path = NULL;
+
+        assert(m);
+
+        r = mkdir_safe_label("/run/systemd/shutdown", 0755, 0, 0);
+        if (r < 0)
+                return log_error_errno(r, "Failed to create shutdown subdirectory: %m");
+
+        t = cescape(m->wall_message);
+        if (!t)
+                return log_oom();
+
+        r = fopen_temporary("/run/systemd/shutdown/scheduled", &f, &temp_path);
+        if (r < 0)
+                return log_error_errno(r, "Failed to save information about scheduled shutdowns: %m");
+
+        (void) fchmod(fileno(f), 0644);
+
+        fprintf(f,
+                "USEC="USEC_FMT"\n"
+                "WARN_WALL=%i\n"
+                "MODE=%s\n",
+                m->scheduled_shutdown_timeout,
+                m->enable_wall_messages,
+                m->scheduled_shutdown_type);
+
+        if (!isempty(m->wall_message))
+                fprintf(f, "WALL_MESSAGE=%s\n", t);
+
+        (void) fflush_and_check(f);
+
+        if (ferror(f) || rename(temp_path, "/run/systemd/shutdown/scheduled") < 0) {
+                log_error_errno(errno, "Failed to write information about scheduled shutdowns: %m");
+                r = -errno;
+
+                (void) unlink(temp_path);
+                (void) unlink("/run/systemd/shutdown/scheduled");
+        }
+
+        return r;
+}
+
+static int manager_scheduled_shutdown_handler(
+                        sd_event_source *s,
+                        uint64_t usec,
+                        void *userdata) {
+
+        _cleanup_bus_error_free_ sd_bus_error error = SD_BUS_ERROR_NULL;
+        Manager *m = userdata;
+        const char *target;
+        int r;
+
+        assert(m);
+
+        if (isempty(m->scheduled_shutdown_type))
+                return 0;
+
+        if (streq(m->scheduled_shutdown_type, "halt"))
+                target = SPECIAL_HALT_TARGET;
+        else if (streq(m->scheduled_shutdown_type, "poweroff"))
+                target = SPECIAL_POWEROFF_TARGET;
+        else
+                target = SPECIAL_REBOOT_TARGET;
+
+        r = execute_shutdown_or_sleep(m, 0, target, &error);
+        if (r < 0)
+                return log_error_errno(r, "Unable to execute transition to %s: %m", target);
+
+        return 0;
+}
+
+static int method_schedule_shutdown(sd_bus *bus, sd_bus_message *message, void *userdata, sd_bus_error *error) {
+        Manager *m = userdata;
+        _cleanup_bus_creds_unref_ sd_bus_creds *creds = NULL;
+        const char *action_multiple_sessions = NULL;
+        const char *action_ignore_inhibit = NULL;
+        const char *action = NULL;
+        uint64_t elapse;
+        char *type;
+        int r;
+
+        assert(m);
+        assert(message);
+
+        r = sd_bus_message_read(message, "st", &type, &elapse);
+        if (r < 0)
+                return r;
+
+        if (streq(type, "reboot")) {
+                action = "org.freedesktop.login1.reboot";
+                action_multiple_sessions = "org.freedesktop.login1.reboot-multiple-sessions";
+                action_ignore_inhibit = "org.freedesktop.login1.reboot-ignore-inhibit";
+        } else if (streq(type, "halt")) {
+                action = "org.freedesktop.login1.halt";
+                action_multiple_sessions = "org.freedesktop.login1.halt-multiple-sessions";
+                action_ignore_inhibit = "org.freedesktop.login1.halt-ignore-inhibit";
+        } else if (streq(type, "poweroff")) {
+                action = "org.freedesktop.login1.poweroff";
+                action_multiple_sessions = "org.freedesktop.login1.poweroff-multiple-sessions";
+                action_ignore_inhibit = "org.freedesktop.login1.poweroff-ignore-inhibit";
+        } else
+                return sd_bus_error_setf(error, SD_BUS_ERROR_INVALID_ARGS, "Unsupported shutdown type");
+
+        r = verify_shutdown_creds(m, message, INHIBIT_SHUTDOWN, false,
+                                  action, action_multiple_sessions, action_ignore_inhibit, error);
+        if (r != 0)
+                return r;
+
+        if (m->scheduled_shutdown_timeout_source) {
+                r = sd_event_source_set_time(m->scheduled_shutdown_timeout_source, elapse);
+                if (r < 0)
+                        return log_error_errno(r, "sd_event_source_set_time() failed: %m");
+
+                r = sd_event_source_set_enabled(m->scheduled_shutdown_timeout_source, SD_EVENT_ONESHOT);
+                if (r < 0)
+                        return log_error_errno(r, "sd_event_source_set_enabled() failed: %m");
+        } else {
+                r = sd_event_add_time(m->event, &m->scheduled_shutdown_timeout_source,
+                                      CLOCK_REALTIME, elapse, 0, manager_scheduled_shutdown_handler, m);
+                if (r < 0)
+                        return log_error_errno(r, "sd_event_add_time() failed: %m");
+        }
+
+        r = free_and_strdup(&m->scheduled_shutdown_type, type);
+        if (r < 0) {
+                m->scheduled_shutdown_timeout_source = sd_event_source_unref(m->scheduled_shutdown_timeout_source);
+                return log_oom();
+        }
+
+        if (m->nologin_timeout_source) {
+                r = sd_event_source_set_time(m->nologin_timeout_source, elapse);
+                if (r < 0)
+                        return log_error_errno(r, "sd_event_source_set_time() failed: %m");
+
+                r = sd_event_source_set_enabled(m->nologin_timeout_source, SD_EVENT_ONESHOT);
+                if (r < 0)
+                        return log_error_errno(r, "sd_event_source_set_enabled() failed: %m");
+        } else {
+                r = sd_event_add_time(m->event, &m->nologin_timeout_source,
+                                      CLOCK_REALTIME, elapse - 5 * USEC_PER_MINUTE, 0, nologin_timeout_handler, m);
+                if (r < 0)
+                        return log_error_errno(r, "sd_event_add_time() failed: %m");
+        }
+
+        m->scheduled_shutdown_timeout = elapse;
+
+        r = sd_bus_query_sender_creds(message, SD_BUS_CREDS_AUGMENT|SD_BUS_CREDS_TTY|SD_BUS_CREDS_UID, &creds);
+        if (r >= 0) {
+                const char *tty;
+
+                (void) sd_bus_creds_get_uid(creds, &m->scheduled_shutdown_uid);
+                (void) sd_bus_creds_get_tty(creds, &tty);
+
+                r = free_and_strdup(&m->scheduled_shutdown_tty, tty);
+                if (r < 0) {
+                        m->scheduled_shutdown_timeout_source = sd_event_source_unref(m->scheduled_shutdown_timeout_source);
+                        return log_oom();
+                }
+        }
+
+        r = manager_setup_wall_message_timer(m);
+        if (r < 0)
+                return r;
+
+        if (!isempty(type)) {
+                r = update_schedule_file(m);
+                if (r < 0)
+                        return r;
+        } else
+                (void) unlink("/run/systemd/shutdown/scheduled");
+
+        return sd_bus_reply_method_return(message, NULL);
+}
+
+static int method_cancel_scheduled_shutdown(sd_bus *bus, sd_bus_message *message, void *userdata, sd_bus_error *error) {
+        Manager *m = userdata;
+        bool cancelled;
+
+        assert(m);
+        assert(message);
+
+        cancelled = m->scheduled_shutdown_type != NULL;
+
+        m->scheduled_shutdown_timeout_source = sd_event_source_unref(m->scheduled_shutdown_timeout_source);
+        m->wall_message_timeout_source = sd_event_source_unref(m->wall_message_timeout_source);
+        m->nologin_timeout_source = sd_event_source_unref(m->nologin_timeout_source);
+        free(m->scheduled_shutdown_type);
+        m->scheduled_shutdown_type = NULL;
+        m->scheduled_shutdown_timeout = 0;
+
+        if (cancelled) {
+                _cleanup_bus_creds_unref_ sd_bus_creds *creds = NULL;
+                const char *tty = NULL;
+                uid_t uid = 0;
+                int r;
+
+                r = sd_bus_query_sender_creds(message, SD_BUS_CREDS_AUGMENT|SD_BUS_CREDS_TTY|SD_BUS_CREDS_UID, &creds);
+                if (r >= 0) {
+                        (void) sd_bus_creds_get_uid(creds, &uid);
+                        (void) sd_bus_creds_get_tty(creds, &tty);
+                }
+
+                utmp_wall("The system shutdown has been cancelled",
+                          lookup_uid(uid), tty, logind_wall_tty_filter, m);
+        }
+
+        return sd_bus_reply_method_return(message, "b", cancelled);
 }
 
 static int method_hibernate(sd_bus *bus, sd_bus_message *message, void *userdata, sd_bus_error *error) {
@@ -1675,7 +2013,6 @@ static int method_hibernate(sd_bus *bus, sd_bus_message *message, void *userdata
                         "org.freedesktop.login1.hibernate-multiple-sessions",
                         "org.freedesktop.login1.hibernate-ignore-inhibit",
                         "hibernate",
-                        method_hibernate,
                         error);
 }
 
@@ -1690,7 +2027,6 @@ static int method_hybrid_sleep(sd_bus *bus, sd_bus_message *message, void *userd
                         "org.freedesktop.login1.hibernate-multiple-sessions",
                         "org.freedesktop.login1.hibernate-ignore-inhibit",
                         "hybrid-sleep",
-                        method_hybrid_sleep,
                         error);
 }
 
@@ -2064,6 +2400,9 @@ fail:
 const sd_bus_vtable manager_vtable[] = {
         SD_BUS_VTABLE_START(0),
 
+        SD_BUS_WRITABLE_PROPERTY("EnableWallMessages", "b", NULL, NULL, offsetof(Manager, enable_wall_messages), 0),
+        SD_BUS_WRITABLE_PROPERTY("WallMessage", "s", NULL, NULL, offsetof(Manager, wall_message), 0),
+
         SD_BUS_PROPERTY("NAutoVTs", "u", NULL, offsetof(Manager, n_autovts), SD_BUS_VTABLE_PROPERTY_CONST),
         SD_BUS_PROPERTY("KillOnlyUsers", "as", NULL, offsetof(Manager, kill_only_users), SD_BUS_VTABLE_PROPERTY_CONST),
         SD_BUS_PROPERTY("KillExcludeUsers", "as", NULL, offsetof(Manager, kill_exclude_users), SD_BUS_VTABLE_PROPERTY_CONST),
@@ -2085,6 +2424,7 @@ const sd_bus_vtable manager_vtable[] = {
         SD_BUS_PROPERTY("IdleActionUSec", "t", NULL, offsetof(Manager, idle_action_usec), SD_BUS_VTABLE_PROPERTY_CONST),
         SD_BUS_PROPERTY("PreparingForShutdown", "b", property_get_preparing, 0, 0),
         SD_BUS_PROPERTY("PreparingForSleep", "b", property_get_preparing, 0, 0),
+        SD_BUS_PROPERTY("ScheduledShutdown", "(st)", property_get_scheduled_shutdown, 0, 0),
 
         SD_BUS_METHOD("GetSession", "s", "o", method_get_session, SD_BUS_VTABLE_UNPRIVILEGED),
         SD_BUS_METHOD("GetSessionByPID", "u", "o", method_get_session_by_pid, SD_BUS_VTABLE_UNPRIVILEGED),
@@ -2114,6 +2454,8 @@ const sd_bus_vtable manager_vtable[] = {
         SD_BUS_METHOD("PowerOff", "b", NULL, method_poweroff, SD_BUS_VTABLE_UNPRIVILEGED),
         SD_BUS_METHOD("Reboot", "b", NULL, method_reboot, SD_BUS_VTABLE_UNPRIVILEGED),
         SD_BUS_METHOD("Suspend", "b", NULL, method_suspend, SD_BUS_VTABLE_UNPRIVILEGED),
+        SD_BUS_METHOD("ScheduleShutdown", "st", NULL, method_schedule_shutdown, SD_BUS_VTABLE_UNPRIVILEGED),
+        SD_BUS_METHOD("CancelScheduledShutdown", NULL, "b", method_cancel_scheduled_shutdown, SD_BUS_VTABLE_UNPRIVILEGED),
         SD_BUS_METHOD("Hibernate", "b", NULL, method_hibernate, SD_BUS_VTABLE_UNPRIVILEGED),
         SD_BUS_METHOD("HybridSleep", "b", NULL, method_hybrid_sleep, SD_BUS_VTABLE_UNPRIVILEGED),
         SD_BUS_METHOD("CanPowerOff", NULL, "s", method_can_poweroff, SD_BUS_VTABLE_UNPRIVILEGED),
@@ -2360,44 +2702,6 @@ int manager_send_changed(Manager *manager, const char *property, ...) {
                         "/org/freedesktop/login1",
                         "org.freedesktop.login1.Manager",
                         l);
-}
-
-int manager_dispatch_delayed(Manager *manager) {
-        _cleanup_bus_error_free_ sd_bus_error error = SD_BUS_ERROR_NULL;
-        Inhibitor *offending = NULL;
-        int r;
-
-        assert(manager);
-
-        if (manager->action_what == 0 || manager->action_job)
-                return 0;
-
-        /* Continue delay? */
-        if (manager_is_inhibited(manager, manager->action_what, INHIBIT_DELAY, NULL, false, false, 0, &offending)) {
-                _cleanup_free_ char *comm = NULL, *u = NULL;
-
-                get_process_comm(offending->pid, &comm);
-                u = uid_to_name(offending->uid);
-
-                if (manager->action_timestamp + manager->inhibit_delay_max > now(CLOCK_MONOTONIC))
-                        return 0;
-
-                log_info("Delay lock is active (UID "UID_FMT"/%s, PID "PID_FMT"/%s) but inhibitor timeout is reached.",
-                         offending->uid, strna(u),
-                         offending->pid, strna(comm));
-        }
-
-        /* Actually do the operation */
-        r = execute_shutdown_or_sleep(manager, manager->action_what, manager->action_unit, &error);
-        if (r < 0) {
-                log_warning("Failed to send delayed message: %s", bus_error_message(&error, r));
-
-                manager->action_unit = NULL;
-                manager->action_what = 0;
-                return r;
-        }
-
-        return 1;
 }
 
 int manager_start_scope(

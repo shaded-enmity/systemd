@@ -64,6 +64,8 @@ static const struct {
            UP must be read before DOWN */
 };
 
+const char *arg_dest = "/tmp";
+
 typedef struct SysvStub {
         char *name;
         char *path;
@@ -79,7 +81,29 @@ typedef struct SysvStub {
         bool reload;
 } SysvStub;
 
-const char *arg_dest = "/tmp";
+static void free_sysvstub(SysvStub *s) {
+        free(s->name);
+        free(s->path);
+        free(s->description);
+        free(s->pid_file);
+        strv_free(s->before);
+        strv_free(s->after);
+        strv_free(s->wants);
+        strv_free(s->wanted_by);
+        strv_free(s->conflicts);
+        free(s);
+}
+
+DEFINE_TRIVIAL_CLEANUP_FUNC(SysvStub*, free_sysvstub);
+
+static void free_sysvstub_hashmapp(Hashmap **h) {
+        SysvStub *stub;
+
+        while ((stub = hashmap_steal_first(*h)))
+                free_sysvstub(stub);
+
+        hashmap_free(*h);
+}
 
 static int add_symlink(const char *service, const char *where) {
         _cleanup_free_ char *from = NULL, *to = NULL;
@@ -132,31 +156,17 @@ static int add_alias(const char *service, const char *alias) {
 static int generate_unit_file(SysvStub *s) {
         char **p;
         _cleanup_fclose_ FILE *f = NULL;
-        _cleanup_free_ char *unit = NULL;
-        _cleanup_free_ char *before = NULL;
-        _cleanup_free_ char *after = NULL;
-        _cleanup_free_ char *wants = NULL;
-        _cleanup_free_ char *conflicts = NULL;
+        _cleanup_free_ char *unit = NULL,
+                *before = NULL, *after = NULL,
+                *wants = NULL, *conflicts = NULL;
         int r;
 
         before = strv_join(s->before, " ");
-        if (!before)
-                return log_oom();
-
         after = strv_join(s->after, " ");
-        if (!after)
-                return log_oom();
-
         wants = strv_join(s->wants, " ");
-        if (!wants)
-                return log_oom();
-
         conflicts = strv_join(s->conflicts, " ");
-        if (!conflicts)
-                return log_oom();
-
         unit = strjoin(arg_dest, "/", s->name, NULL);
-        if (!unit)
+        if (!before || !after || !wants || !conflicts || !unit)
                 return log_oom();
 
         /* We might already have a symlink with the same name from a Provides:,
@@ -320,6 +330,101 @@ finish:
         return 1;
 }
 
+static int handle_provides(SysvStub *s, unsigned line, const char *full_text, const char *text) {
+        const char *word, *state_;
+        size_t z;
+        int r;
+
+        FOREACH_WORD_QUOTED(word, z, text, state_) {
+                _cleanup_free_ char *n = NULL, *m = NULL;
+
+                n = strndup(word, z);
+                if (!n)
+                        return log_oom();
+
+                r = sysv_translate_facility(n, basename(s->path), &m);
+                if (r < 0)
+                        return r;
+                if (r == 0)
+                        continue;
+
+                if (unit_name_to_type(m) == UNIT_SERVICE) {
+                        log_debug("Adding Provides: alias '%s' for '%s'", m, s->name);
+                        r = add_alias(s->name, m);
+                        if (r < 0)
+                                log_unit_warning_errno(s->name, r,
+                                                       "[%s:%u] Failed to add LSB Provides name %s, ignoring: %m",
+                                                       s->path, line, m);
+                } else {
+                        /* NB: SysV targets which are provided by a
+                         * service are pulled in by the services, as
+                         * an indication that the generic service is
+                         * now available. This is strictly one-way.
+                         * The targets do NOT pull in SysV services! */
+                        r = strv_extend(&s->before, m);
+                        if (r < 0)
+                                return log_oom();
+                        r = strv_extend(&s->wants, m);
+                        if (r < 0)
+                                return log_oom();
+                        if (streq(m, SPECIAL_NETWORK_ONLINE_TARGET)) {
+                                r = strv_extend(&s->before, SPECIAL_NETWORK_TARGET);
+                                if (r < 0)
+                                        return log_oom();
+                        }
+                }
+        }
+        if (!isempty(state_))
+                log_unit_error(s->name,
+                               "[%s:%u] Trailing garbage in Provides, ignoring.",
+                               s->path, line);
+        return 0;
+}
+
+static int handle_dependencies(SysvStub *s, unsigned line, const char *full_text, const char *text) {
+        const char *word, *state_;
+        size_t z;
+        int r;
+
+        FOREACH_WORD_QUOTED(word, z, text, state_) {
+                _cleanup_free_ char *n = NULL, *m = NULL;
+                bool is_before;
+
+                n = strndup(word, z);
+                if (!n)
+                        return log_oom();
+
+                r = sysv_translate_facility(n, basename(s->path), &m);
+                if (r < 0) {
+                        log_unit_warning_errno(s->name, r,
+                                               "[%s:%u] Failed to translate LSB dependency %s, ignoring: %m",
+                                               s->path, line, n);
+                        continue;
+                }
+                if (r == 0)
+                        continue;
+
+                is_before = startswith_no_case(full_text, "X-Start-Before:");
+
+                if (streq(m, SPECIAL_NETWORK_ONLINE_TARGET) && !is_before) {
+                        /* the network-online target is special, as it needs to be actively pulled in */
+                        r = strv_extend(&s->after, m);
+                        if (r < 0)
+                                return log_oom();
+                        r = strv_extend(&s->wants, m);
+                } else
+                        r = strv_extend(is_before ? &s->before : &s->after, m);
+
+                if (r < 0)
+                        return log_oom();
+        }
+        if (!isempty(state_))
+                log_unit_warning(s->name,
+                                 "[%s:%u] Trailing garbage in %*s, ignoring.",
+                                 s->path, line, (int)(strchr(full_text, ':') - full_text), full_text);
+        return 0;
+}
+
 static int load_sysv(SysvStub *s) {
         _cleanup_fclose_ FILE *f;
         unsigned line = 0;
@@ -350,10 +455,9 @@ static int load_sysv(SysvStub *s) {
                         if (feof(f))
                                 break;
 
-                        log_unit_error(s->name,
-                                       "Failed to read configuration file '%s': %m",
-                                       s->path);
-                        return -errno;
+                        return log_unit_error_errno(s->name, errno,
+                                                    "Failed to read configuration file '%s': %m",
+                                                    s->path);
                 }
 
                 line++;
@@ -471,126 +575,22 @@ static int load_sysv(SysvStub *s) {
                 } else if (state == LSB || state == LSB_DESCRIPTION) {
 
                         if (startswith_no_case(t, "Provides:")) {
-                                const char *word, *state_;
-                                size_t z;
-
                                 state = LSB;
 
-                                FOREACH_WORD_QUOTED(word, z, t+9, state_) {
-                                        _cleanup_free_ char *n = NULL, *m = NULL;
-
-                                        n = strndup(word, z);
-                                        if (!n)
-                                                return -ENOMEM;
-
-                                        r = sysv_translate_facility(n, basename(s->path), &m);
-                                        if (r < 0)
-                                                return r;
-                                        if (r == 0)
-                                                continue;
-
-                                        if (unit_name_to_type(m) == UNIT_SERVICE) {
-                                                log_debug("Adding Provides: alias '%s' for '%s'", m, s->name);
-                                                r = add_alias(s->name, m);
-                                        } else {
-                                                /* NB: SysV targets
-                                                 * which are provided
-                                                 * by a service are
-                                                 * pulled in by the
-                                                 * services, as an
-                                                 * indication that the
-                                                 * generic service is
-                                                 * now available. This
-                                                 * is strictly
-                                                 * one-way. The
-                                                 * targets do NOT pull
-                                                 * in the SysV
-                                                 * services! */
-                                                r = strv_extend(&s->before, m);
-                                                if (r < 0)
-                                                        return log_oom();
-                                                r = strv_extend(&s->wants, m);
-                                                if (r < 0)
-                                                        return log_oom();
-                                                if (streq(m, SPECIAL_NETWORK_ONLINE_TARGET)) {
-                                                        r = strv_extend(&s->before, SPECIAL_NETWORK_TARGET);
-                                                        if (r < 0)
-                                                                return log_oom();
-                                                }
-                                        }
-
-                                        if (r < 0)
-                                                log_unit_error(s->name,
-                                                               "[%s:%u] Failed to add LSB Provides name %s, ignoring: %s",
-                                                               s->path, line, m, strerror(-r));
-                                }
-                                if (!isempty(state_))
-                                        log_unit_error(s->name,
-                                                       "[%s:%u] Trailing garbage in Provides, ignoring.",
-                                                       s->path, line);
-
+                                r = handle_provides(s, line, t, t + 9);
+                                if (r < 0)
+                                        return r;
                         } else if (startswith_no_case(t, "Required-Start:") ||
                                    startswith_no_case(t, "Should-Start:") ||
                                    startswith_no_case(t, "X-Start-Before:") ||
                                    startswith_no_case(t, "X-Start-After:")) {
-                                const char *word, *state_;
-                                size_t z;
 
                                 state = LSB;
 
-                                FOREACH_WORD_QUOTED(word, z, strchr(t, ':')+1, state_) {
-                                        _cleanup_free_ char *n = NULL, *m = NULL;
-                                        bool is_before;
+                                r = handle_dependencies(s, line, t, strchr(t, ':') + 1);
+                                if (r < 0)
+                                        return r;
 
-                                        n = strndup(word, z);
-                                        if (!n)
-                                                return -ENOMEM;
-
-                                        r = sysv_translate_facility(n, basename(s->path), &m);
-                                        if (r < 0) {
-                                                log_unit_error(s->name,
-                                                               "[%s:%u] Failed to translate LSB dependency %s, ignoring: %s",
-                                                               s->path, line, n, strerror(-r));
-                                                continue;
-                                        }
-
-                                        if (r == 0)
-                                                continue;
-
-                                        is_before = startswith_no_case(t, "X-Start-Before:");
-
-                                        if (streq(m, SPECIAL_NETWORK_ONLINE_TARGET) && !is_before) {
-                                                /* the network-online target is special, as it needs to be actively pulled in */
-                                                r = strv_extend(&s->after, m);
-                                                if (r < 0)
-                                                        return log_oom();
-                                                r = strv_extend(&s->wants, m);
-                                                if (r < 0)
-                                                        return log_oom();
-                                        }
-                                        else {
-                                                if (is_before) {
-                                                        r = strv_extend(&s->before, m);
-                                                        if (r < 0)
-                                                                return log_oom();
-                                                }
-                                                else {
-                                                        r = strv_extend(&s->after, m);
-                                                        if (r < 0)
-                                                                return log_oom();
-                                                }
-                                        }
-
-                                        if (r < 0)
-                                                log_unit_error(s->name,
-                                                               "[%s:%u] Failed to add dependency on %s, ignoring: %s",
-                                                               s->path, line, m, strerror(-r));
-                                }
-                                if (!isempty(state_))
-                                        log_unit_error(s->name,
-                                                       "[%s:%u] Trailing garbage in %*s, ignoring.",
-                                                       s->path, line,
-                                                       (int)(strchr(t, ':') - t), t);
 
                         } else if (startswith_no_case(t, "Description:")) {
                                 char *d, *j;
@@ -735,7 +735,7 @@ static int enumerate_sysv(const LookupPaths *lp, Hashmap *all_services) {
 
                 while ((de = readdir(d))) {
                         _cleanup_free_ char *fpath = NULL, *name = NULL;
-                        _cleanup_free_ SysvStub *service = NULL;
+                        _cleanup_(free_sysvstubp) SysvStub *service = NULL;
                         struct stat st;
                         int r;
 
@@ -793,7 +793,7 @@ static int set_dependencies_from_rcnd(const LookupPaths *lp, Hashmap *all_servic
         char **p;
         unsigned i;
         _cleanup_closedir_ DIR *d = NULL;
-        _cleanup_free_ char *path = NULL, *fpath = NULL, *name = NULL;
+        _cleanup_free_ char *path = NULL, *fpath = NULL;
         SysvStub *service;
         Iterator j;
         Set *runlevel_services[ELEMENTSOF(rcnd_table)] = {};
@@ -821,6 +821,8 @@ static int set_dependencies_from_rcnd(const LookupPaths *lp, Hashmap *all_servic
                         }
 
                         while ((de = readdir(d))) {
+                                _cleanup_free_ char *name = NULL;
+
                                 int a, b;
 
                                 if (hidden_file(de->d_name))
@@ -919,8 +921,8 @@ finish:
 
 int main(int argc, char *argv[]) {
         int r, q;
-        LookupPaths lp;
-        Hashmap *all_services;
+        _cleanup_lookup_paths_free_ LookupPaths lp = {};
+        _cleanup_(free_sysvstub_hashmapp) Hashmap *all_services = NULL;
         SysvStub *service;
         Iterator j;
 

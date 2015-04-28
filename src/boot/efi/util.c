@@ -33,10 +33,15 @@ UINT64 ticks_read(VOID) {
         __asm__ volatile ("rdtsc" : "=a" (a), "=d" (d));
         return (d << 32) | a;
 }
-#else
+#elif defined(__i386__)
 UINT64 ticks_read(VOID) {
         UINT64 val;
         __asm__ volatile ("rdtsc" : "=A" (val));
+        return val;
+}
+#else
+UINT64 ticks_read(VOID) {
+        UINT64 val = 1;
         return val;
 }
 #endif

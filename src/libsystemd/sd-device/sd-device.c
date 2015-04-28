@@ -158,15 +158,21 @@ int device_set_syspath(sd_device *device, const char *_syspath, bool verify) {
 
         if (verify) {
                 r = readlink_and_canonicalize(_syspath, &syspath);
-                if (r == -EINVAL) {
+                if (r == -ENOENT)
+                        /* the device does not exist (any more?) */
+                        return -ENODEV;
+                else if (r == -EINVAL) {
                         /* not a symlink */
                         syspath = canonicalize_file_name(_syspath);
                         if (!syspath) {
+                                if (errno == ENOENT)
+                                        /* the device does not exist (any more?) */
+                                        return -ENODEV;
+
                                 log_debug("sd-device: could not canonicalize '%s': %m", _syspath);
                                 return -errno;
                         }
-                /* ignore errors due to the link not being a symlink */
-                } else if (r < 0 && r != -EINVAL) {
+                } else if (r < 0) {
                         log_debug("sd-device: could not get target of '%s': %s", _syspath, strerror(-r));
                         return r;
                 }
@@ -178,15 +184,17 @@ int device_set_syspath(sd_device *device, const char *_syspath, bool verify) {
                         path = strjoina(syspath, "/uevent");
                         r = access(path, F_OK);
                         if (r < 0) {
+                                if (errno == ENOENT)
+                                        /* this is not a valid device */
+                                        return -ENODEV;
+
                                 log_debug("sd-device: %s does not have an uevent file: %m", syspath);
                                 return -errno;
                         }
                 } else {
                         /* everything else just just needs to be a directory */
-                        if (!is_dir(syspath, false)) {
-                                log_debug("sd-device: %s is not a directory", syspath);
-                                return -EINVAL;
-                        }
+                        if (!is_dir(syspath, false))
+                                return -ENODEV;
                 }
         } else {
                 syspath = strdup(_syspath);
@@ -301,7 +309,7 @@ _public_ int sd_device_new_from_subsystem_sysname(sd_device **ret, const char *s
                         return sd_device_new_from_syspath(ret, syspath);
         }
 
-        return -ENOENT;
+        return -ENODEV;
 }
 
 int device_set_devtype(sd_device *device, const char *_devtype) {
@@ -492,6 +500,8 @@ int device_read_uevent_file(sd_device *device) {
         if (device->uevent_loaded || device->sealed)
                 return 0;
 
+        device->uevent_loaded = true;
+
         r = sd_device_get_syspath(device, &syspath);
         if (r < 0)
                 return r;
@@ -499,7 +509,13 @@ int device_read_uevent_file(sd_device *device) {
         path = strjoina(syspath, "/uevent");
 
         r = read_full_file(path, &uevent, &uevent_len);
-        if (r < 0) {
+        if (r == -EACCES)
+                /* empty uevent files may be write-only */
+                return 0;
+        else if (r == -ENOENT)
+                /* some devices may not have uevent files, see set_syspath() */
+                return 0;
+        else if (r < 0) {
                 log_debug("sd-device: failed to read uevent file '%s': %s", path, strerror(-r));
                 return r;
         }
@@ -555,8 +571,6 @@ int device_read_uevent_file(sd_device *device) {
                 if (r < 0)
                         log_debug("sd-device: could not set 'MAJOR=%s' or 'MINOR=%s' from '%s': %s", major, minor, path, strerror(-r));
         }
-
-        device->uevent_loaded = true;
 
         return 0;
 }
@@ -624,7 +638,7 @@ _public_ int sd_device_new_from_device_id(sd_device **ret, const char *id) {
                 if (r < 0)
                         return r;
 
-                /* this si racey, so we might end up with the wrong device */
+                /* this is racey, so we might end up with the wrong device */
                 if (ifr.ifr_ifindex != ifindex)
                         return -ENODEV;
 
@@ -697,7 +711,7 @@ static int device_new_from_child(sd_device **ret, sd_device *child) {
                 return 0;
         }
 
-        return -ENOENT;
+        return -ENODEV;
 }
 
 _public_ int sd_device_get_parent(sd_device *child, sd_device **ret) {
@@ -769,10 +783,10 @@ _public_ int sd_device_get_subsystem(sd_device *device, const char **ret) {
                         r = device_set_subsystem(device, "drivers");
                 else if (path_startswith(device->devpath, "/subsystem/") ||
                          path_startswith(device->devpath, "/class/") ||
-                         path_startswith(device->devpath, "/buss/"))
+                         path_startswith(device->devpath, "/bus/"))
                         r = device_set_subsystem(device, "subsystem");
                 if (r < 0)
-                        return r;
+                        return log_debug_errno(r, "sd-device: could not set subsystem for %s: %m", device->devpath);
 
                 device->subsystem_set = true;
         }
@@ -1209,7 +1223,7 @@ int device_get_id_filename(sd_device *device, const char **ret) {
         return 0;
 }
 
-static int device_read_db(sd_device *device) {
+int device_read_db_aux(sd_device *device, bool force) {
         _cleanup_free_ char *db = NULL;
         char *path;
         const char *id, *value;
@@ -1226,8 +1240,10 @@ static int device_read_db(sd_device *device) {
                 INVALID_LINE,
         } state = PRE_KEY;
 
-        if (device->db_loaded || device->sealed)
+        if (device->db_loaded || (!force && device->sealed))
                 return 0;
+
+        device->db_loaded = true;
 
         r = device_get_id_filename(device, &id);
         if (r < 0)
@@ -1297,9 +1313,11 @@ static int device_read_db(sd_device *device) {
                 }
         }
 
-        device->db_loaded = true;
-
         return 0;
+}
+
+static int device_read_db(sd_device *device) {
+        return device_read_db_aux(device, false);
 }
 
 _public_ int sd_device_get_is_initialized(sd_device *device, int *initialized) {

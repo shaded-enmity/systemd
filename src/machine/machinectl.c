@@ -52,6 +52,8 @@
 #include "copy.h"
 #include "verbs.h"
 #include "import-util.h"
+#include "process-util.h"
+#include "terminal-util.h"
 
 static char **arg_property = NULL;
 static bool arg_all = false;

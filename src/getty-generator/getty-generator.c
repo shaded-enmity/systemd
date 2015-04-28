@@ -31,6 +31,8 @@
 #include "virt.h"
 #include "fileio.h"
 #include "path-util.h"
+#include "process-util.h"
+#include "terminal-util.h"
 
 static const char *arg_dest = "/tmp";
 

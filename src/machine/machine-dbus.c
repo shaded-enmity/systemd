@@ -42,6 +42,8 @@
 #include "bus-internal.h"
 #include "machine.h"
 #include "machine-dbus.h"
+#include "formats-util.h"
+#include "process-util.h"
 
 static int property_get_id(
                 sd_bus *bus,

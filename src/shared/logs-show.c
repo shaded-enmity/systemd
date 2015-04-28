@@ -31,6 +31,9 @@
 #include "utf8.h"
 #include "hashmap.h"
 #include "journal-internal.h"
+#include "formats-util.h"
+#include "process-util.h"
+#include "terminal-util.h"
 
 /* up to three lines (each up to 100 characters),
    or 300 characters, whichever is less */
@@ -406,8 +409,8 @@ static int output_verbose(
         if (r == -ENOENT)
                 log_debug("Source realtime timestamp not found");
         else if (r < 0) {
-                log_full(r == -EADDRNOTAVAIL ? LOG_DEBUG : LOG_ERR,
-                         "Failed to get source realtime timestamp: %s", strerror(-r));
+                log_full_errno(r == -EADDRNOTAVAIL ? LOG_DEBUG : LOG_ERR, r,
+                               "Failed to get source realtime timestamp: %m");
                 return r;
         } else {
                 _cleanup_free_ char *value = NULL;
@@ -426,8 +429,8 @@ static int output_verbose(
         if (r < 0) {
                 r = sd_journal_get_realtime_usec(j, &realtime);
                 if (r < 0) {
-                        log_full(r == -EADDRNOTAVAIL ? LOG_DEBUG : LOG_ERR,
-                                 "Failed to get realtime timestamp: %s", strerror(-r));
+                        log_full_errno(r == -EADDRNOTAVAIL ? LOG_DEBUG : LOG_ERR, r,
+                                       "Failed to get realtime timestamp: %m");
                         return r;
                 }
         }

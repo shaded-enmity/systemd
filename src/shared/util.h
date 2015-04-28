@@ -43,50 +43,10 @@
 #include <sys/inotify.h>
 #include <sys/statfs.h>
 
-#if SIZEOF_PID_T == 4
-#  define PID_PRI PRIi32
-#elif SIZEOF_PID_T == 2
-#  define PID_PRI PRIi16
-#else
-#  error Unknown pid_t size
-#endif
-#define PID_FMT "%" PID_PRI
-
-#if SIZEOF_UID_T == 4
-#  define UID_FMT "%" PRIu32
-#elif SIZEOF_UID_T == 2
-#  define UID_FMT "%" PRIu16
-#else
-#  error Unknown uid_t size
-#endif
-
-#if SIZEOF_GID_T == 4
-#  define GID_FMT "%" PRIu32
-#elif SIZEOF_GID_T == 2
-#  define GID_FMT "%" PRIu16
-#else
-#  error Unknown gid_t size
-#endif
-
-#if SIZEOF_TIME_T == 8
-#  define PRI_TIME PRIi64
-#elif SIZEOF_TIME_T == 4
-#  define PRI_TIME PRIu32
-#else
-#  error Unknown time_t size
-#endif
-
-#if SIZEOF_RLIM_T == 8
-#  define RLIM_FMT "%" PRIu64
-#elif SIZEOF_RLIM_T == 4
-#  define RLIM_FMT "%" PRIu32
-#else
-#  error Unknown rlim_t size
-#endif
-
 #include "macro.h"
 #include "missing.h"
 #include "time-util.h"
+#include "formats-util.h"
 
 /* What is interpreted as whitespace? */
 #define WHITESPACE " \t\n\r"
@@ -102,16 +62,6 @@
 #define SHELL_NEED_QUOTES SHELL_NEED_ESCAPE GLOB_CHARS "'()<>|&;"
 
 #define FORMAT_BYTES_MAX 8
-
-#define ANSI_HIGHLIGHT_ON "\x1B[1;39m"
-#define ANSI_RED_ON "\x1B[31m"
-#define ANSI_HIGHLIGHT_RED_ON "\x1B[1;31m"
-#define ANSI_GREEN_ON "\x1B[32m"
-#define ANSI_HIGHLIGHT_GREEN_ON "\x1B[1;32m"
-#define ANSI_HIGHLIGHT_YELLOW_ON "\x1B[1;33m"
-#define ANSI_HIGHLIGHT_BLUE_ON "\x1B[1;34m"
-#define ANSI_HIGHLIGHT_OFF "\x1B[0m"
-#define ANSI_ERASE_TO_END_OF_LINE "\x1B[K"
 
 size_t page_size(void) _pure_;
 #define PAGE_ALIGN(l) ALIGN_TO((l), page_size())
@@ -267,13 +217,8 @@ const char* split(const char **state, size_t *l, const char *separator, bool quo
 #define _FOREACH_WORD(word, length, s, separator, quoted, state)        \
         for ((state) = (s), (word) = split(&(state), &(length), (separator), (quoted)); (word); (word) = split(&(state), &(length), (separator), (quoted)))
 
-pid_t get_parent_of_pid(pid_t pid, pid_t *ppid);
-
 char *strappend(const char *s, const char *suffix);
 char *strnappend(const char *s, const char *suffix, size_t length);
-
-char *replace_env(const char *format, char **env);
-char **replace_env_argv(char **argv, char **env);
 
 int readlinkat_malloc(int fd, const char *p, char **ret);
 int readlink_malloc(const char *p, char **r);
@@ -292,17 +237,6 @@ char *file_in_same_dir(const char *path, const char *filename);
 
 int rmdir_parents(const char *path, const char *stop);
 
-int get_process_state(pid_t pid);
-int get_process_comm(pid_t pid, char **name);
-int get_process_cmdline(pid_t pid, size_t max_length, bool comm_fallback, char **line);
-int get_process_exe(pid_t pid, char **name);
-int get_process_uid(pid_t pid, uid_t *uid);
-int get_process_gid(pid_t pid, gid_t *gid);
-int get_process_capeff(pid_t pid, char **capeff);
-int get_process_cwd(pid_t pid, char **cwd);
-int get_process_root(pid_t pid, char **root);
-int get_process_environ(pid_t pid, char **environ);
-
 char hexchar(int x) _const_;
 int unhexchar(char c) _const_;
 char octchar(int x) _const_;
@@ -311,6 +245,7 @@ char decchar(int x) _const_;
 int undecchar(char c) _const_;
 
 char *cescape(const char *s);
+size_t cescape_char(char c, char *buf);
 
 typedef enum UnescapeFlags {
         UNESCAPE_RELAX = 1,
@@ -330,26 +265,6 @@ bool dirent_is_file_with_suffix(const struct dirent *de, const char *suffix) _pu
 bool hidden_file(const char *filename) _pure_;
 
 bool chars_intersect(const char *a, const char *b) _pure_;
-
-int make_stdio(int fd);
-int make_null_stdio(void);
-int make_console_stdio(void);
-
-int dev_urandom(void *p, size_t n);
-void random_bytes(void *p, size_t n);
-void initialize_srand(void);
-
-static inline uint64_t random_u64(void) {
-        uint64_t u;
-        random_bytes(&u, sizeof(u));
-        return u;
-}
-
-static inline uint32_t random_u32(void) {
-        uint32_t u;
-        random_bytes(&u, sizeof(u));
-        return u;
-}
 
 /* For basic lookup tables with strictly enumerated entries */
 #define _DEFINE_STRING_TABLE_LOOKUP_TO_STRING(name,type,scope)          \
@@ -416,19 +331,6 @@ int close_all_fds(const int except[], unsigned n_except);
 
 bool fstype_is_network(const char *fstype);
 
-int chvt(int vt);
-
-int read_one_char(FILE *f, char *ret, usec_t timeout, bool *need_nl);
-int ask_char(char *ret, const char *replies, const char *text, ...) _printf_(3, 4);
-int ask_string(char **ret, const char *text, ...) _printf_(2, 3);
-
-int reset_terminal_fd(int fd, bool switch_to_text);
-int reset_terminal(const char *name);
-
-int open_terminal(const char *name, int mode);
-int acquire_terminal(const char *name, bool fail, bool force, bool ignore_tiocstty_eperm, usec_t timeout);
-int release_terminal(void);
-
 int flush_fd(int fd);
 
 int ignore_signals(int sig, ...);
@@ -446,8 +348,6 @@ bool is_device_path(const char *path);
 int dir_is_empty(const char *path);
 char* dirname_malloc(const char *path);
 
-void rename_process(const char name[8]);
-
 void sigset_add_many(sigset_t *ss, ...);
 int sigprocmask_many(int how, ...);
 
@@ -457,12 +357,6 @@ char* lookup_uid(uid_t uid);
 char* gethostname_malloc(void);
 char* getlogname_malloc(void);
 char* getusername_malloc(void);
-
-int getttyname_malloc(int fd, char **r);
-int getttyname_harder(int fd, char **r);
-
-int get_ctty_devnr(pid_t pid, dev_t *d);
-int get_ctty(pid_t, dev_t *_devnr, char **r);
 
 int chmod_and_chown(const char *path, mode_t mode, uid_t uid, gid_t gid);
 int fchmod_and_fchown(int fd, mode_t mode, uid_t uid, gid_t gid);
@@ -474,42 +368,7 @@ int pipe_eof(int fd);
 
 cpu_set_t* cpu_set_malloc(unsigned *ncpus);
 
-int status_vprintf(const char *status, bool ellipse, bool ephemeral, const char *format, va_list ap) _printf_(4,0);
-int status_printf(const char *status, bool ellipse, bool ephemeral, const char *format, ...) _printf_(4,5);
-
 #define xsprintf(buf, fmt, ...) assert_se((size_t) snprintf(buf, ELEMENTSOF(buf), fmt, __VA_ARGS__) < ELEMENTSOF(buf))
-
-int fd_columns(int fd);
-unsigned columns(void);
-int fd_lines(int fd);
-unsigned lines(void);
-void columns_lines_cache_reset(int _unused_ signum);
-
-bool on_tty(void);
-
-static inline const char *ansi_highlight(void) {
-        return on_tty() ? ANSI_HIGHLIGHT_ON : "";
-}
-
-static inline const char *ansi_highlight_red(void) {
-        return on_tty() ? ANSI_HIGHLIGHT_RED_ON : "";
-}
-
-static inline const char *ansi_highlight_green(void) {
-        return on_tty() ? ANSI_HIGHLIGHT_GREEN_ON : "";
-}
-
-static inline const char *ansi_highlight_yellow(void) {
-        return on_tty() ? ANSI_HIGHLIGHT_YELLOW_ON : "";
-}
-
-static inline const char *ansi_highlight_blue(void) {
-        return on_tty() ? ANSI_HIGHLIGHT_BLUE_ON : "";
-}
-
-static inline const char *ansi_highlight_off(void) {
-        return on_tty() ? ANSI_HIGHLIGHT_OFF : "";
-}
 
 int files_same(const char *filea, const char *fileb);
 
@@ -522,12 +381,6 @@ char *ellipsize_mem(const char *s, size_t old_length, size_t new_length, unsigne
 int touch_file(const char *path, bool parents, usec_t stamp, uid_t uid, gid_t gid, mode_t mode);
 int touch(const char *path);
 
-char *unquote(const char *s, const char *quotes);
-char *normalize_env_assignment(const char *s);
-
-int wait_for_terminate(pid_t pid, siginfo_t *status);
-int wait_for_terminate_and_warn(const char *name, pid_t pid, bool check_exit_code);
-
 noreturn void freeze(void);
 
 bool null_or_empty(struct stat *st) _pure_;
@@ -538,16 +391,7 @@ DIR *xopendirat(int dirfd, const char *name, int flags);
 
 char *fstab_node_to_udev_node(const char *p);
 
-char *resolve_dev_console(char **active);
-bool tty_is_vc(const char *tty);
-bool tty_is_vc_resolve(const char *tty);
-bool tty_is_console(const char *tty) _pure_;
-int vtnr_from_tty(const char *tty);
-const char *default_term_for_tty(const char *tty);
-
 void execute_directories(const char* const* directories, usec_t timeout, char *argv[]);
-
-int kill_and_sigcont(pid_t pid, int sig);
 
 bool nulstr_contains(const char*nulstr, const char *needle);
 
@@ -560,10 +404,6 @@ bool machine_name_is_valid(const char *s) _pure_;
 
 char* strshorten(char *s, size_t l);
 
-int terminal_vhangup_fd(int fd);
-int terminal_vhangup(const char *name);
-
-int vt_disallocate(const char *name);
 
 int symlink_atomic(const char *from, const char *to);
 int mknod_atomic(const char *path, mode_t mode, dev_t dev);
@@ -647,8 +487,6 @@ int fd_wait_for_event(int fd, int event, usec_t timeout);
 
 void* memdup(const void *p, size_t l) _alloc_(2);
 
-int is_kernel_thread(pid_t pid);
-
 int fd_inc_sndbuf(int fd, size_t n);
 int fd_inc_rcvbuf(int fd, size_t n);
 
@@ -656,16 +494,12 @@ int fork_agent(pid_t *pid, const int except[], unsigned n_except, const char *pa
 
 int setrlimit_closest(int resource, const struct rlimit *rlim);
 
-int getenv_for_pid(pid_t pid, const char *field, char **_value);
-
 bool http_url_is_valid(const char *url) _pure_;
 bool documentation_url_is_valid(const char *url) _pure_;
 
 bool http_etag_is_valid(const char *etag);
 
 bool in_initrd(void);
-
-void warn_melody(void);
 
 int get_home_dir(char **ret);
 int get_shell(char **_ret);
@@ -934,19 +768,6 @@ int unlink_noerrno(const char *path);
                 _d_;                                                    \
         })
 
-#define procfs_file_alloca(pid, field)                                  \
-        ({                                                              \
-                pid_t _pid_ = (pid);                                    \
-                const char *_r_;                                        \
-                if (_pid_ == 0) {                                       \
-                        _r_ = ("/proc/self/" field);                    \
-                } else {                                                \
-                        _r_ = alloca(strlen("/proc/") + DECIMAL_STR_MAX(pid_t) + 1 + sizeof(field)); \
-                        sprintf((char*) _r_, "/proc/"PID_FMT"/" field, _pid_);                       \
-                }                                                       \
-                _r_;                                                    \
-        })
-
 bool id128_is_valid(const char *s) _pure_;
 
 int split_pair(const char *s, const char *sep, char **l, char **r);
@@ -973,9 +794,6 @@ int container_get_leader(const char *machine, pid_t *pid);
 
 int namespace_open(pid_t pid, int *pidns_fd, int *mntns_fd, int *netns_fd, int *root_fd);
 int namespace_enter(int pidns_fd, int mntns_fd, int netns_fd, int root_fd);
-
-bool pid_is_alive(pid_t pid);
-bool pid_is_unwaited(pid_t pid);
 
 int getpeercred(int fd, struct ucred *ucred);
 int getpeersec(int fd, char **ret);
@@ -1092,3 +910,5 @@ void cmsg_close_all(struct msghdr *mh);
 int rename_noreplace(int olddirfd, const char *oldpath, int newdirfd, const char *newpath);
 
 char *shell_maybe_quote(const char *s);
+
+int parse_mode(const char *s, mode_t *ret);

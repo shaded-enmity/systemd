@@ -32,8 +32,11 @@
 #include "bus-error.h"
 #include "logind.h"
 #include "udev-util.h"
+#include "formats-util.h"
 
-Manager *manager_new(void) {
+static void manager_free(Manager *m);
+
+static Manager *manager_new(void) {
         Manager *m;
         int r;
 
@@ -99,7 +102,7 @@ fail:
         return NULL;
 }
 
-void manager_free(Manager *m) {
+static void manager_free(Manager *m) {
         Session *session;
         User *u;
         Device *d;
@@ -140,6 +143,10 @@ void manager_free(Manager *m) {
         set_free_free(m->busnames);
 
         sd_event_source_unref(m->idle_action_event_source);
+        sd_event_source_unref(m->inhibit_timeout_source);
+        sd_event_source_unref(m->scheduled_shutdown_timeout_source);
+        sd_event_source_unref(m->nologin_timeout_source);
+        sd_event_source_unref(m->wall_message_timeout_source);
 
         sd_event_source_unref(m->console_active_event_source);
         sd_event_source_unref(m->udev_seat_event_source);
@@ -162,6 +169,9 @@ void manager_free(Manager *m) {
         if (m->udev)
                 udev_unref(m->udev);
 
+        if (m->unlink_nologin)
+                unlink("/run/nologin");
+
         bus_verify_polkit_async_registry_free(m->polkit_registry);
 
         sd_bus_unref(m->bus);
@@ -172,6 +182,9 @@ void manager_free(Manager *m) {
         strv_free(m->kill_only_users);
         strv_free(m->kill_exclude_users);
 
+        free(m->scheduled_shutdown_type);
+        free(m->scheduled_shutdown_tty);
+        free(m->wall_message);
         free(m->action_job);
         free(m);
 }
@@ -888,7 +901,7 @@ static int manager_connect_udev(Manager *m) {
         return 0;
 }
 
-void manager_gc(Manager *m, bool drop_not_started) {
+static void manager_gc(Manager *m, bool drop_not_started) {
         Seat *seat;
         Session *session;
         User *user;
@@ -999,7 +1012,7 @@ static int manager_dispatch_idle_action(sd_event_source *s, uint64_t t, void *us
         return 0;
 }
 
-int manager_startup(Manager *m) {
+static int manager_startup(Manager *m) {
         int r;
         Seat *seat;
         Session *session;
@@ -1086,14 +1099,12 @@ int manager_startup(Manager *m) {
         return 0;
 }
 
-int manager_run(Manager *m) {
+static int manager_run(Manager *m) {
         int r;
 
         assert(m);
 
         for (;;) {
-                usec_t us = (uint64_t) -1;
-
                 r = sd_event_get_state(m->event);
                 if (r < 0)
                         return r;
@@ -1102,19 +1113,7 @@ int manager_run(Manager *m) {
 
                 manager_gc(m, true);
 
-                if (manager_dispatch_delayed(m) > 0)
-                        continue;
-
-                if (m->action_what != 0 && !m->action_job) {
-                        usec_t x, y;
-
-                        x = now(CLOCK_MONOTONIC);
-                        y = m->action_timestamp + m->inhibit_delay_max;
-
-                        us = x >= y ? 0 : y - x;
-                }
-
-                r = sd_event_run(m->event, us);
+                r = sd_event_run(m->event, (uint64_t) -1);
                 if (r < 0)
                         return r;
         }

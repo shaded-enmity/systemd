@@ -21,6 +21,7 @@
 #pragma once
 
 #include "libudev.h"
+#include "libudev-private.h"
 #include "sd-device.h"
 
 /**
@@ -46,17 +47,11 @@ struct udev_device {
         uint64_t tags_generation;
         struct udev_list devlinks;
         uint64_t devlinks_generation;
+        bool properties_read:1;
+        bool tags_read:1;
+        bool devlinks_read:1;
         struct udev_list sysattrs;
         bool sysattrs_read;
 };
 
 struct udev_device *udev_device_new(struct udev *udev);
-
-#define assert_return_errno(expr, r, err)                               \
-        do {                                                            \
-                if (_unlikely_(!(expr))) {                              \
-                        log_assert_failed_return(#expr, __FILE__, __LINE__, __PRETTY_FUNCTION__); \
-                        errno = err;                                    \
-                        return (r);                                     \
-                }                                                       \
-        } while (false)

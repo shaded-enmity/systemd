@@ -46,6 +46,8 @@
 #include "dbus.h"
 #include "execute.h"
 #include "dropin.h"
+#include "formats-util.h"
+#include "process-util.h"
 
 const UnitVTable * const unit_vtable[_UNIT_TYPE_MAX] = {
         [UNIT_SERVICE] = &service_vtable,
@@ -181,12 +183,8 @@ int unit_add_name(Unit *u, const char *text) {
                 return -E2BIG;
 
         r = set_put(u->names, s);
-        if (r < 0) {
-                if (r == -EEXIST)
-                        return 0;
-
+        if (r <= 0)
                 return r;
-        }
 
         r = hashmap_put(u->manager->units, s, u);
         if (r < 0) {
@@ -1161,7 +1159,6 @@ static int unit_add_mount_dependencies(Unit *u) {
 
 static int unit_add_startup_units(Unit *u) {
         CGroupContext *c;
-        int r = 0;
 
         c = unit_get_cgroup_context(u);
         if (!c)
@@ -1171,11 +1168,7 @@ static int unit_add_startup_units(Unit *u) {
             c->startup_blockio_weight == (unsigned long) -1)
                 return 0;
 
-        r = set_put(u->manager->startup_units, u);
-        if (r == -EEXIST)
-                return 0;
-
-        return r;
+        return set_put(u->manager->startup_units, u);
 }
 
 int unit_load(Unit *u) {
@@ -2651,6 +2644,40 @@ void unit_serialize_item(Unit *u, FILE *f, const char *key, const char *value) {
         fprintf(f, "%s=%s\n", key, value);
 }
 
+static int unit_set_cgroup_path(Unit *u, const char *path) {
+        _cleanup_free_ char *p = NULL;
+        int r;
+
+        assert(u);
+
+        if (path) {
+                p = strdup(path);
+                if (!p)
+                        return -ENOMEM;
+        } else
+                p = NULL;
+
+        if (streq_ptr(u->cgroup_path, p))
+                return 0;
+
+        if (p) {
+                r = hashmap_put(u->manager->cgroup_unit, p, u);
+                if (r < 0)
+                        return r;
+        }
+
+        if (u->cgroup_path) {
+                log_unit_debug(u->id, "%s: Changing cgroup path from %s to %s.", u->id, u->cgroup_path, strna(p));
+                hashmap_remove(u->manager->cgroup_unit, u->cgroup_path);
+                free(u->cgroup_path);
+        }
+
+        u->cgroup_path = p;
+        p = NULL;
+
+        return 0;
+}
+
 int unit_deserialize(Unit *u, FILE *f, FDSet *fds) {
         ExecRuntime **rt = NULL;
         size_t offset;
@@ -2678,7 +2705,7 @@ int unit_deserialize(Unit *u, FILE *f, FDSet *fds) {
                 l = strstrip(line);
 
                 /* End marker */
-                if (l[0] == 0)
+                if (isempty(l))
                         return 0;
 
                 k = strcspn(l, "=");
@@ -2696,7 +2723,7 @@ int unit_deserialize(Unit *u, FILE *f, FDSet *fds) {
 
                                 j = job_new_raw(u);
                                 if (!j)
-                                        return -ENOMEM;
+                                        return log_oom();
 
                                 r = job_deserialize(j, f, fds);
                                 if (r < 0) {
@@ -2746,60 +2773,48 @@ int unit_deserialize(Unit *u, FILE *f, FDSet *fds) {
                         dual_timestamp_deserialize(v, &u->assert_timestamp);
                         continue;
                 } else if (streq(l, "condition-result")) {
-                        int b;
 
-                        b = parse_boolean(v);
-                        if (b < 0)
-                                log_debug("Failed to parse condition result value %s", v);
+                        r = parse_boolean(v);
+                        if (r < 0)
+                                log_debug("Failed to parse condition result value %s, ignoring.", v);
                         else
-                                u->condition_result = b;
+                                u->condition_result = r;
 
                         continue;
 
                 } else if (streq(l, "assert-result")) {
-                        int b;
 
-                        b = parse_boolean(v);
-                        if (b < 0)
-                                log_debug("Failed to parse assert result value %s", v);
+                        r = parse_boolean(v);
+                        if (r < 0)
+                                log_debug("Failed to parse assert result value %s, ignoring.", v);
                         else
-                                u->assert_result = b;
+                                u->assert_result = r;
 
                         continue;
 
                 } else if (streq(l, "transient")) {
-                        int b;
 
-                        b = parse_boolean(v);
-                        if (b < 0)
-                                log_debug("Failed to parse transient bool %s", v);
+                        r = parse_boolean(v);
+                        if (r < 0)
+                                log_debug("Failed to parse transient bool %s, ignoring.", v);
                         else
-                                u->transient = b;
+                                u->transient = r;
 
                         continue;
+
                 } else if (streq(l, "cpuacct-usage-base")) {
 
                         r = safe_atou64(v, &u->cpuacct_usage_base);
                         if (r < 0)
-                                log_debug("Failed to parse CPU usage %s", v);
+                                log_debug("Failed to parse CPU usage %s, ignoring.", v);
+
+                        continue;
 
                 } else if (streq(l, "cgroup")) {
-                        char *s;
 
-                        s = strdup(v);
-                        if (!s)
-                                return -ENOMEM;
-
-                        if (u->cgroup_path) {
-                                void *p;
-
-                                p = hashmap_remove(u->manager->cgroup_unit, u->cgroup_path);
-                                log_info("Removing cgroup_path %s from hashmap (%p)", u->cgroup_path, p);
-                                free(u->cgroup_path);
-                        }
-
-                        u->cgroup_path = s;
-                        assert(hashmap_put(u->manager->cgroup_unit, s, u) == 1);
+                        r = unit_set_cgroup_path(u, v);
+                        if (r < 0)
+                                log_debug_errno(r, "Failed to set cgroup path %s, ignoring: %m", v);
 
                         continue;
                 }
@@ -2807,15 +2822,19 @@ int unit_deserialize(Unit *u, FILE *f, FDSet *fds) {
                 if (unit_can_serialize(u)) {
                         if (rt) {
                                 r = exec_runtime_deserialize_item(rt, u, l, v, fds);
-                                if (r < 0)
-                                        return r;
+                                if (r < 0) {
+                                        log_unit_warning(u->id, "Failed to deserialize runtime parameter '%s', ignoring.", l);
+                                        continue;
+                                }
+
+                                /* Returns positive if key was handled by the call */
                                 if (r > 0)
                                         continue;
                         }
 
                         r = UNIT_VTABLE(u)->deserialize_item(u, l, v, fds);
                         if (r < 0)
-                                return r;
+                                log_unit_warning(u->id, "Failed to deserialize unit parameter '%s', ignoring.", l);
                 }
         }
 }
@@ -2827,12 +2846,16 @@ int unit_add_node_link(Unit *u, const char *what, bool wants) {
 
         assert(u);
 
-        if (!what)
+        /* Adds in links to the device node that this unit is based on */
+        if (isempty(what))
                 return 0;
 
-        /* Adds in links to the device node that this unit is based on */
-
         if (!is_device_path(what))
+                return 0;
+
+        /* When device units aren't supported (such as in a
+         * container), don't create dependencies on them. */
+        if (unit_vtable[UNIT_DEVICE]->supported && !unit_vtable[UNIT_DEVICE]->supported(u->manager))
                 return 0;
 
         e = unit_name_from_path(what, ".device");
@@ -2856,34 +2879,38 @@ int unit_add_node_link(Unit *u, const char *what, bool wants) {
         return 0;
 }
 
-static int unit_add_deserialized_job_coldplug(Unit *u) {
-        int r;
-
-        r = manager_add_job(u->manager, u->deserialized_job, u, JOB_IGNORE_REQUIREMENTS, false, NULL, NULL);
-        if (r < 0)
-                return r;
-
-        u->deserialized_job = _JOB_TYPE_INVALID;
-
-        return 0;
-}
-
-int unit_coldplug(Unit *u, Hashmap *deferred_work) {
+int unit_coldplug(Unit *u) {
+        Unit *other;
+        Iterator i;
         int r;
 
         assert(u);
 
-        if (UNIT_VTABLE(u)->coldplug)
-                if ((r = UNIT_VTABLE(u)->coldplug(u, deferred_work)) < 0)
+        /* Make sure we don't enter a loop, when coldplugging
+         * recursively. */
+        if (u->coldplugged)
+                return 0;
+
+        u->coldplugged = true;
+
+        if (UNIT_VTABLE(u)->coldplug) {
+                r = UNIT_VTABLE(u)->coldplug(u);
+                if (r < 0)
                         return r;
+        }
 
         if (u->job) {
                 r = job_coldplug(u->job);
                 if (r < 0)
                         return r;
-        } else if (u->deserialized_job >= 0)
+        } else if (u->deserialized_job >= 0) {
                 /* legacy */
-                hashmap_put(deferred_work, u, &unit_add_deserialized_job_coldplug);
+                r = manager_add_job(u->manager, u->deserialized_job, u, JOB_IGNORE_REQUIREMENTS, false, NULL, NULL);
+                if (r < 0)
+                        return r;
+
+                u->deserialized_job = _JOB_TYPE_INVALID;
+        }
 
         return 0;
 }
@@ -3608,11 +3635,9 @@ int unit_require_mounts_for(Unit *u, const char *path) {
                 if (!x) {
                         char *q;
 
-                        if (!u->manager->units_requiring_mounts_for) {
-                                u->manager->units_requiring_mounts_for = hashmap_new(&string_hash_ops);
-                                if (!u->manager->units_requiring_mounts_for)
-                                        return -ENOMEM;
-                        }
+                        r = hashmap_ensure_allocated(&u->manager->units_requiring_mounts_for, &string_hash_ops);
+                        if (r < 0)
+                                return r;
 
                         q = strdup(prefix);
                         if (!q)

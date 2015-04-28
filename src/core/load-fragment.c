@@ -1202,17 +1202,15 @@ int config_parse_exec_mount_flags(const char *unit,
                         flags = MS_SHARED;
                 else if (streq(t, "slave"))
                         flags = MS_SLAVE;
-                else if (streq(word, "private"))
+                else if (streq(t, "private"))
                         flags = MS_PRIVATE;
                 else {
-                        log_syntax(unit, LOG_ERR, filename, line, EINVAL,
-                                   "Failed to parse mount flag %s, ignoring: %s", t, rvalue);
+                        log_syntax(unit, LOG_ERR, filename, line, EINVAL, "Failed to parse mount flag %s, ignoring: %s", t, rvalue);
                         return 0;
                 }
         }
         if (!isempty(state))
-                log_syntax(unit, LOG_ERR, filename, line, EINVAL,
-                           "Trailing garbage, ignoring.");
+                log_syntax(unit, LOG_ERR, filename, line, EINVAL, "Trailing garbage, ignoring.");
 
         c->mount_flags = flags;
         return 0;
@@ -2369,7 +2367,7 @@ int config_parse_syscall_filter(
                                         continue;
 
                                 r = set_put(c->syscall_filter, INT_TO_PTR(id + 1));
-                                if (r == -EEXIST)
+                                if (r == 0)
                                         continue;
                                 if (r < 0)
                                         return log_oom();
@@ -2397,7 +2395,7 @@ int config_parse_syscall_filter(
                  */
                 if (!invert == c->syscall_whitelist)  {
                         r = set_put(c->syscall_filter, INT_TO_PTR(id + 1));
-                        if (r == -EEXIST)
+                        if (r == 0)
                                 continue;
                         if (r < 0)
                                 return log_oom();
@@ -2459,7 +2457,7 @@ int config_parse_syscall_archs(
                 }
 
                 r = set_put(*archs, UINT32_TO_PTR(a + 1));
-                if (r == -EEXIST)
+                if (r == 0)
                         continue;
                 if (r < 0)
                         return log_oom();
@@ -2570,7 +2568,7 @@ int config_parse_address_families(
                  */
                 if (!invert == c->address_families_whitelist)  {
                         r = set_put(c->address_families, INT_TO_PTR(af));
-                        if (r == -EEXIST)
+                        if (r == 0)
                                 continue;
                         if (r < 0)
                                 return log_oom();

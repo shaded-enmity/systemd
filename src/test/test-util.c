@@ -37,6 +37,7 @@
 #include "fileio.h"
 #include "conf-parser.h"
 #include "virt.h"
+#include "process-util.h"
 
 static void test_streq_ptr(void) {
         assert_se(streq_ptr(NULL, NULL));
@@ -521,21 +522,6 @@ static void test_foreach_word_quoted(void) {
               true);
 }
 
-static void test_default_term_for_tty(void) {
-        puts(default_term_for_tty("/dev/tty23"));
-        puts(default_term_for_tty("/dev/ttyS23"));
-        puts(default_term_for_tty("/dev/tty0"));
-        puts(default_term_for_tty("/dev/pty0"));
-        puts(default_term_for_tty("/dev/pts/0"));
-        puts(default_term_for_tty("/dev/console"));
-        puts(default_term_for_tty("tty23"));
-        puts(default_term_for_tty("ttyS23"));
-        puts(default_term_for_tty("tty0"));
-        puts(default_term_for_tty("pty0"));
-        puts(default_term_for_tty("pts/0"));
-        puts(default_term_for_tty("console"));
-}
-
 static void test_memdup_multiply(void) {
         int org[] = {1, 2, 3};
         int *dup;
@@ -570,69 +556,6 @@ static void test_u64log2(void) {
         assert_se(u64log2(16) == 4);
         assert_se(u64log2(1024*1024) == 20);
         assert_se(u64log2(1024*1024+5) == 20);
-}
-
-static void test_get_process_comm(void) {
-        struct stat st;
-        _cleanup_free_ char *a = NULL, *c = NULL, *d = NULL, *f = NULL, *i = NULL, *cwd = NULL, *root = NULL;
-        _cleanup_free_ char *env = NULL;
-        pid_t e;
-        uid_t u;
-        gid_t g;
-        dev_t h;
-        int r;
-        pid_t me;
-
-        if (stat("/proc/1/comm", &st) == 0) {
-                assert_se(get_process_comm(1, &a) >= 0);
-                log_info("pid1 comm: '%s'", a);
-        } else {
-                log_warning("/proc/1/comm does not exist.");
-        }
-
-        assert_se(get_process_cmdline(1, 0, true, &c) >= 0);
-        log_info("pid1 cmdline: '%s'", c);
-
-        assert_se(get_process_cmdline(1, 8, false, &d) >= 0);
-        log_info("pid1 cmdline truncated: '%s'", d);
-
-        assert_se(get_parent_of_pid(1, &e) >= 0);
-        log_info("pid1 ppid: "PID_FMT, e);
-        assert_se(e == 0);
-
-        assert_se(is_kernel_thread(1) == 0);
-
-        r = get_process_exe(1, &f);
-        assert_se(r >= 0 || r == -EACCES);
-        log_info("pid1 exe: '%s'", strna(f));
-
-        assert_se(get_process_uid(1, &u) == 0);
-        log_info("pid1 uid: "UID_FMT, u);
-        assert_se(u == 0);
-
-        assert_se(get_process_gid(1, &g) == 0);
-        log_info("pid1 gid: "GID_FMT, g);
-        assert_se(g == 0);
-
-        me = getpid();
-
-        r = get_process_cwd(me, &cwd);
-        assert_se(r >= 0 || r == -EACCES);
-        log_info("pid1 cwd: '%s'", cwd);
-
-        r = get_process_root(me, &root);
-        assert_se(r >= 0 || r == -EACCES);
-        log_info("pid1 root: '%s'", root);
-
-        r = get_process_environ(me, &env);
-        assert_se(r >= 0 || r == -EACCES);
-        log_info("self strlen(environ): '%zu'", strlen(env));
-
-        if (!detect_container(NULL))
-                assert_se(get_ctty_devnr(1, &h) == -ENOENT);
-
-        getenv_for_pid(1, "PATH", &i);
-        log_info("pid1 $PATH: '%s'", strna(i));
 }
 
 static void test_protect_errno(void) {
@@ -1043,38 +966,6 @@ static void test_readlink_and_make_absolute(void) {
         assert_se(rm_rf(tempdir, REMOVE_ROOT|REMOVE_PHYSICAL) >= 0);
 }
 
-static void test_read_one_char(void) {
-        _cleanup_fclose_ FILE *file = NULL;
-        char r;
-        bool need_nl;
-        char name[] = "/tmp/test-read_one_char.XXXXXX";
-        int fd;
-
-        fd = mkostemp_safe(name, O_RDWR|O_CLOEXEC);
-        assert_se(fd >= 0);
-        file = fdopen(fd, "r+");
-        assert_se(file);
-        assert_se(fputs("c\n", file) >= 0);
-        rewind(file);
-
-        assert_se(read_one_char(file, &r, 1000000, &need_nl) >= 0);
-        assert_se(!need_nl);
-        assert_se(r == 'c');
-        assert_se(read_one_char(file, &r, 1000000, &need_nl) < 0);
-
-        rewind(file);
-        assert_se(fputs("foobar\n", file) >= 0);
-        rewind(file);
-        assert_se(read_one_char(file, &r, 1000000, &need_nl) < 0);
-
-        rewind(file);
-        assert_se(fputs("\n", file) >= 0);
-        rewind(file);
-        assert_se(read_one_char(file, &r, 1000000, &need_nl) < 0);
-
-        unlink(name);
-}
-
 static void test_ignore_signals(void) {
         assert_se(ignore_signals(SIGINT, -1) >= 0);
         assert_se(kill(getpid(), SIGINT) >= 0);
@@ -1136,40 +1027,6 @@ static void test_is_symlink(void) {
 
         unlink(name);
         unlink(name_link);
-}
-
-static void test_pid_is_unwaited(void) {
-        pid_t pid;
-
-        pid = fork();
-        assert_se(pid >= 0);
-        if (pid == 0) {
-                _exit(EXIT_SUCCESS);
-        } else {
-                int status;
-
-                waitpid(pid, &status, 0);
-                assert_se(!pid_is_unwaited(pid));
-        }
-        assert_se(pid_is_unwaited(getpid()));
-        assert_se(!pid_is_unwaited(-1));
-}
-
-static void test_pid_is_alive(void) {
-        pid_t pid;
-
-        pid = fork();
-        assert_se(pid >= 0);
-        if (pid == 0) {
-                _exit(EXIT_SUCCESS);
-        } else {
-                int status;
-
-                waitpid(pid, &status, 0);
-                assert_se(!pid_is_alive(pid));
-        }
-        assert_se(pid_is_alive(getpid()));
-        assert_se(!pid_is_alive(-1));
 }
 
 static void test_search_and_fopen(void) {
@@ -1376,6 +1233,17 @@ static void test_unquote_first_word(void) {
         assert_se(streq(t, "foobax6ar"));
         free(t);
         assert_se(p == original + 13);
+
+        p = original = "    f\\u00f6o \"pi\\U0001F4A9le\"   ";
+        assert_se(unquote_first_word(&p, &t, UNQUOTE_CUNESCAPE) > 0);
+        assert_se(streq(t, "föo"));
+        free(t);
+        assert_se(p == original + 13);
+
+        assert_se(unquote_first_word(&p, &t, UNQUOTE_CUNESCAPE) > 0);
+        assert_se(streq(t, "pi\360\237\222\251le"));
+        free(t);
+        assert_se(p == original + 32);
 }
 
 static void test_unquote_many_words(void) {
@@ -1565,6 +1433,20 @@ static void test_shell_maybe_quote(void) {
         test_shell_maybe_quote_one("foo$bar", "\"foo\\$bar\"");
 }
 
+static void test_parse_mode(void) {
+        mode_t m;
+
+        assert_se(parse_mode("-1", &m) < 0);
+        assert_se(parse_mode("", &m) < 0);
+        assert_se(parse_mode("888", &m) < 0);
+        assert_se(parse_mode("77777", &m) < 0);
+
+        assert_se(parse_mode("544", &m) >= 0 && m == 0544);
+        assert_se(parse_mode("777", &m) >= 0 && m == 0777);
+        assert_se(parse_mode("7777", &m) >= 0 && m == 07777);
+        assert_se(parse_mode("0", &m) >= 0 && m == 0);
+}
+
 int main(int argc, char *argv[]) {
         log_parse_environment();
         log_open();
@@ -1596,11 +1478,9 @@ int main(int argc, char *argv[]) {
         test_cunescape();
         test_foreach_word();
         test_foreach_word_quoted();
-        test_default_term_for_tty();
         test_memdup_multiply();
         test_hostname_is_valid();
         test_u64log2();
-        test_get_process_comm();
         test_protect_errno();
         test_parse_size();
         test_config_parse_iec_off();
@@ -1624,13 +1504,10 @@ int main(int argc, char *argv[]) {
         test_close_nointr();
         test_unlink_noerrno();
         test_readlink_and_make_absolute();
-        test_read_one_char();
         test_ignore_signals();
         test_strshorten();
         test_strjoina();
         test_is_symlink();
-        test_pid_is_unwaited();
-        test_pid_is_alive();
         test_search_and_fopen();
         test_search_and_fopen_nulstr();
         test_glob_exists();
@@ -1643,6 +1520,7 @@ int main(int argc, char *argv[]) {
         test_uid_ptr();
         test_sparse_write();
         test_shell_maybe_quote();
+        test_parse_mode();
 
         return 0;
 }

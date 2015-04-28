@@ -322,9 +322,11 @@ global:
         sd_bus_creds_ref;
         sd_bus_creds_unref;
         sd_bus_creds_get_mask;
+        sd_bus_creds_get_augmented_mask;
         sd_bus_creds_get_uid;
         sd_bus_creds_get_gid;
         sd_bus_creds_get_pid;
+        sd_bus_creds_get_ppid;
         sd_bus_creds_get_tid;
         sd_bus_creds_get_comm;
         sd_bus_creds_get_tid_comm;
@@ -343,6 +345,7 @@ global:
         sd_bus_creds_get_selinux_context;
         sd_bus_creds_get_audit_session_id;
         sd_bus_creds_get_audit_login_uid;
+        sd_bus_creds_get_tty;
         sd_bus_creds_get_unique_name;
         sd_bus_creds_get_well_known_names;
         sd_bus_creds_get_description;

@@ -27,6 +27,9 @@
 #include "bus-util.h"
 #include "bus-error.h"
 #include "logind-action.h"
+#include "formats-util.h"
+#include "process-util.h"
+#include "terminal-util.h"
 
 int manager_handle_action(
                 Manager *m,

@@ -68,8 +68,14 @@ int main(int argc, char *argv[]) {
                 return EXIT_SUCCESS;
         }
 
-        if (path_is_mount_point("/boot", true) <= 0 &&
-            dir_is_empty("/boot") <= 0) {
+        r = path_is_mount_point("/boot", true);
+        if (r > 0) {
+                log_debug("/boot is already a mount point, exiting.");
+                return EXIT_SUCCESS;
+        }
+        if (r == -ENOENT)
+                log_debug("/boot does not exist, continuing.");
+        else if (dir_is_empty("/boot") <= 0) {
                 log_debug("/boot already populated, exiting.");
                 return EXIT_SUCCESS;
         }
@@ -135,7 +141,8 @@ int main(int argc, char *argv[]) {
               "[Unit]\n"
               "Description=EFI System Partition Automount\n\n"
               "[Automount]\n"
-              "Where=/boot\n", f);
+              "Where=/boot\n"
+              "TimeoutIdleSec=120\n", f);
 
         fflush(f);
         if (ferror(f)) {

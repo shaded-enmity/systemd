@@ -120,7 +120,6 @@
 /systemd-rfkill
 /systemd-run
 /systemd-shutdown
-/systemd-shutdownd
 /systemd-sleep
 /systemd-socket-proxyd
 /systemd-stdio-bridge
@@ -141,6 +140,7 @@
 /systemd-vconsole-setup
 /tags
 /test-architecture
+/test-audit-type
 /test-async
 /test-barrier
 /test-boot-timestamp
@@ -234,6 +234,7 @@
 /test-path-util
 /test-pppoe
 /test-prioq
+/test-process-util
 /test-pty
 /test-qcow2
 /test-ratelimit
@@ -255,6 +256,7 @@
 /test-tables
 /test-term-page
 /test-term-parser
+/test-terminal-util
 /test-time
 /test-tmpfiles
 /test-udev

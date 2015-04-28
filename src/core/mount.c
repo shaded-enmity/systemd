@@ -40,6 +40,7 @@
 #include "special.h"
 #include "exit-status.h"
 #include "fstab-util.h"
+#include "formats-util.h"
 
 #define RETRY_UMOUNT_MAX 32
 
@@ -547,7 +548,7 @@ static int mount_load(Unit *u) {
         return mount_verify(m);
 }
 
-static int mount_notify_automount(Mount *m, int status) {
+static int mount_notify_automount(Mount *m, MountState old_state, MountState state) {
         Unit *p;
         int r;
         Iterator i;
@@ -556,7 +557,7 @@ static int mount_notify_automount(Mount *m, int status) {
 
         SET_FOREACH(p, UNIT(m)->dependencies[UNIT_TRIGGERED_BY], i)
                 if (p->type == UNIT_AUTOMOUNT) {
-                         r = automount_send_ready(AUTOMOUNT(p), status);
+                         r = automount_update_mount(AUTOMOUNT(p), old_state, state);
                          if (r < 0)
                                  return r;
                 }
@@ -587,21 +588,7 @@ static void mount_set_state(Mount *m, MountState state) {
                 m->control_command_id = _MOUNT_EXEC_COMMAND_INVALID;
         }
 
-        if (state == MOUNT_MOUNTED ||
-            state == MOUNT_REMOUNTING)
-                mount_notify_automount(m, 0);
-        else if (state == MOUNT_DEAD ||
-                 state == MOUNT_UNMOUNTING ||
-                 state == MOUNT_MOUNTING_SIGTERM ||
-                 state == MOUNT_MOUNTING_SIGKILL ||
-                 state == MOUNT_REMOUNTING_SIGTERM ||
-                 state == MOUNT_REMOUNTING_SIGKILL ||
-                 state == MOUNT_UNMOUNTING_SIGTERM ||
-                 state == MOUNT_UNMOUNTING_SIGKILL ||
-                 state == MOUNT_FAILED) {
-                if (state != old_state)
-                        mount_notify_automount(m, -ENODEV);
-        }
+        mount_notify_automount(m, old_state, state);
 
         if (state != old_state)
                 log_unit_debug(UNIT(m)->id,
@@ -614,7 +601,7 @@ static void mount_set_state(Mount *m, MountState state) {
         m->reload_result = MOUNT_SUCCESS;
 }
 
-static int mount_coldplug(Unit *u, Hashmap *deferred_work) {
+static int mount_coldplug(Unit *u) {
         Mount *m = MOUNT(u);
         MountState new_state = MOUNT_DEAD;
         int r;

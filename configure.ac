@@ -47,6 +47,7 @@ AS_IF([test "x$enable_largefile" = "xno"], [AC_MSG_ERROR([--disable-largefile is
 SET_ARCH(X86_64, x86_64*)
 SET_ARCH(IA32, i*86*)
 SET_ARCH(MIPS, mips*)
+SET_ARCH(AARCH64, aarch64*)
 
 # i18n stuff for the PolicyKit policy files, heck whether intltool can be found, disable NLS otherwise
 AC_CHECK_PROG(intltool_found, [intltool-merge], [yes], [no])
@@ -119,6 +120,7 @@ GOBJECT_INTROSPECTION_CHECK([1.31.1])
    AM_CONDITIONAL([HAVE_INTROSPECTION], [false])
    enable_introspection=no])
 
+AC_CHECK_TOOL(OBJCOPY, objcopy)
 AC_CHECK_TOOL(STRINGS, strings)
 AC_CHECK_TOOL(GPERF, gperf)
 if test -z "$GPERF" ; then
@@ -779,6 +781,7 @@ else
         AUDIT_LIBS=
 fi
 AC_SUBST(AUDIT_LIBS)
+AM_CONDITIONAL([HAVE_AUDIT], [test "x$have_audit" != xno])
 
 # ------------------------------------------------------------------------------
 AC_ARG_ENABLE([elfutils],
@@ -1148,8 +1151,7 @@ fi
 AM_CONDITIONAL(ENABLE_EFI, [test "x$have_efi" = "xyes"])
 
 # ------------------------------------------------------------------------------
-EFI_CC=gcc
-AC_SUBST([EFI_CC])
+AC_CHECK_TOOL(EFI_CC, gcc)
 
 EFI_ARCH=`echo $host | sed "s/\(-\).*$//"`
 
@@ -1159,6 +1161,9 @@ AM_COND_IF(ARCH_IA32, [
 
 AM_COND_IF(ARCH_X86_64, [
         EFI_MACHINE_TYPE_NAME=x64])
+
+AM_COND_IF(ARCH_AARCH64, [
+        EFI_MACHINE_TYPE_NAME=aa64])
 
 AC_SUBST([EFI_ARCH])
 AC_SUBST([EFI_MACHINE_TYPE_NAME])
@@ -1173,7 +1178,7 @@ AS_IF([test "x$enable_gnuefi" != "xno"], [
                        [AC_MSG_ERROR([*** gnuefi support requested but headers not found])])
         ])
 
-        efiroot=$(echo $(cd /usr/lib/$(gcc -print-multi-os-directory); pwd))
+        efiroot=$(echo $(cd /usr/lib/$(${EFI_CC} -print-multi-os-directory); pwd))
 
         EFI_LIB_DIR="$efiroot"
         AC_ARG_WITH(efi-libdir,
@@ -1187,7 +1192,7 @@ AS_IF([test "x$enable_gnuefi" != "xno"], [
                 AS_HELP_STRING([--with-efi-ldsdir=PATH], [Path to EFI lds directory]),
                 [EFI_LDS_DIR="$withval" && AC_CHECK_FILE([${EFI_LDS_DIR}/elf_${EFI_ARCH}_efi.lds],
                         [have_efi_lds=yes])],
-                [AS_FOR([DIR], [EFI_LDS_DIR], ["${efiroot}/gnuefi" "${efiroot}"],
+                [AS_FOR([DIR], [EFI_LDS_DIR], ["${EFI_LIB_DIR}/gnuefi" "${EFI_LIB_DIR}"],
                         [AC_CHECK_FILE([${EFI_LDS_DIR}/elf_${EFI_ARCH}_efi.lds],
                                        [have_efi_lds=yes && break])])])
         AS_IF([test "x$have_efi_lds" = xyes],

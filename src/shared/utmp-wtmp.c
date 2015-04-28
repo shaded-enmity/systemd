@@ -30,6 +30,7 @@
 #include "macro.h"
 #include "path-util.h"
 #include "utmp-wtmp.h"
+#include "terminal-util.h"
 
 int utmp_get_runlevel(int *runlevel, int *previous) {
         struct utmpx *found, lookup = { .ut_type = RUN_LVL };
@@ -346,8 +347,14 @@ static int write_to_terminal(const char *tty, const char *message) {
         return 0;
 }
 
-int utmp_wall(const char *message, const char *username, bool (*match_tty)(const char *tty)) {
-        _cleanup_free_ char *text = NULL, *hn = NULL, *un = NULL, *tty = NULL;
+int utmp_wall(
+        const char *message,
+        const char *username,
+        const char *origin_tty,
+        bool (*match_tty)(const char *tty, void *userdata),
+        void *userdata) {
+
+        _cleanup_free_ char *text = NULL, *hn = NULL, *un = NULL, *stdin_tty = NULL;
         char date[FORMAT_TIMESTAMP_MAX];
         struct utmpx *u;
         int r;
@@ -361,14 +368,17 @@ int utmp_wall(const char *message, const char *username, bool (*match_tty)(const
                         return -ENOMEM;
         }
 
-        getttyname_harder(STDIN_FILENO, &tty);
+        if (!origin_tty) {
+                getttyname_harder(STDIN_FILENO, &stdin_tty);
+                origin_tty = stdin_tty;
+        }
 
         if (asprintf(&text,
                      "\a\r\n"
                      "Broadcast message from %s@%s%s%s (%s):\r\n\r\n"
                      "%s\r\n\r\n",
                      un ?: username, hn,
-                     tty ? " on " : "", strempty(tty),
+                     origin_tty ? " on " : "", strempty(origin_tty),
                      format_timestamp(date, sizeof(date), now(CLOCK_REALTIME)),
                      message) < 0)
                 return -ENOMEM;
@@ -395,7 +405,7 @@ int utmp_wall(const char *message, const char *username, bool (*match_tty)(const
                         path = buf;
                 }
 
-                if (!match_tty || match_tty(path)) {
+                if (!match_tty || match_tty(path, userdata)) {
                         q = write_to_terminal(path, text);
                         if (q < 0)
                                 r = q;

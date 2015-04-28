@@ -32,8 +32,10 @@
 #include "mkdir.h"
 #include "time-util.h"
 #include "path-util.h"
+#include "random-util.h"
 #include "locale-util.h"
 #include "ask-password-api.h"
+#include "terminal-util.h"
 
 static char *arg_root = NULL;
 static char *arg_locale = NULL;  /* $LANG */

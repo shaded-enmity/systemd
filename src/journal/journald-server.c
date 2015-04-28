@@ -50,6 +50,8 @@
 #include "journald-audit.h"
 #include "journald-server.h"
 #include "acl-util.h"
+#include "formats-util.h"
+#include "process-util.h"
 
 #ifdef HAVE_SELINUX
 #include <selinux/selinux.h>

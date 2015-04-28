@@ -35,6 +35,8 @@
 #include "log.h"
 #include "virt.h"
 #include "fileio.h"
+#include "process-util.h"
+#include "terminal-util.h"
 
 static bool is_vconsole(int fd) {
         unsigned char data[1];

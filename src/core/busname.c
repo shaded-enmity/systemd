@@ -30,6 +30,7 @@
 #include "bus-policy.h"
 #include "dbus-busname.h"
 #include "busname.h"
+#include "formats-util.h"
 
 static const UnitActiveState state_translation_table[_BUSNAME_STATE_MAX] = {
         [BUSNAME_DEAD] = UNIT_INACTIVE,
@@ -335,7 +336,7 @@ static void busname_set_state(BusName *n, BusNameState state) {
         unit_notify(UNIT(n), state_translation_table[old_state], state_translation_table[state], true);
 }
 
-static int busname_coldplug(Unit *u, Hashmap *deferred_work) {
+static int busname_coldplug(Unit *u) {
         BusName *n = BUSNAME(u);
         int r;
 
@@ -550,7 +551,7 @@ static void busname_enter_running(BusName *n) {
         if (!n->activating)
                 return;
 
-        /* We don't take conenctions anymore if we are supposed to
+        /* We don't take connections anymore if we are supposed to
          * shut down anyway */
 
         if (unit_stop_pending(UNIT(n))) {
