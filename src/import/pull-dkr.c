@@ -841,10 +841,9 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         goto finish;
                 }
 
-                log_info("===============================================================");
+                /*log_info("===============================================================");
                 printf("%s\n", (const char *)j->payload);
-                log_info("===============================================================");
-
+                log_info("===============================================================");*/
                 log_info("JSON manifest with schema v%"PRIi64" for %s parsed!",
                                 json_variant_integer(json_variant_value(doc, "schemaVersion")),
                                 json_variant_string(json_variant_value(doc, "name")));
@@ -884,8 +883,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                                 ancestry[size] = strdup(layer);
                                 ancestry[size+1] = NULL;
                                 size += 1;
-
-                                log_info(" -- %" PRIu64 ". %s", size, layer);
+                                //log_info(" -- %" PRIu64 ". %s", size, layer);
                         }
                 }
 
@@ -904,7 +902,6 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 }
 
                 e = json_variant_value(compat, "id");
-                log_info("Provenance:\n  ImageID: %s\n  Digest:  %s", json_variant_string(e), i->response_digest);
 
                 strv_free(i->ancestry);
                 i->ancestry = strv_reverse(strv_uniq(ancestry));
@@ -915,6 +912,11 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 free(i->image_root);
                 i->image_root = path;
                 ancestry = NULL;
+
+                log_info("Required layers:\n");
+                STRV_FOREACH(k, i->ancestry)
+                        log_info("\t%s", *k);
+                log_info("\nProvenance:\n  ImageID: %s\n  Digest:  %s", json_variant_string(e), i->response_digest);
 
                 dkr_pull_report_progress(i, DKR_DOWNLOADING);
 
