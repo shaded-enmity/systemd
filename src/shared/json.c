@@ -733,6 +733,7 @@ out:
 static int json_parse_tokens(json_variant **tokens, size_t ntokens, json_variant **rv) {
 
         size_t it = 0;
+        int r;
         json_variant *e;
         _cleanup_jsonunref_ json_variant *p;
 
@@ -746,7 +747,8 @@ static int json_parse_tokens(json_variant **tokens, size_t ntokens, json_variant
         if (e->type != JSON_VARIANT_CONTROL && e->value.integer != JSON_OBJECT_OPEN)
 		return -EBADMSG;
 
-        if (0 > json_scoped_parse(tokens, &it, ntokens, p))
+        r = json_scoped_parse(tokens, &it, ntokens, p);
+        if (r < 0)
 		return -EBADMSG;
 
         *rv = p;
@@ -839,14 +841,17 @@ int json_parse(const char *string, json_variant **rv) {
         _cleanup_jsonarrayunref_ json_variant **s = NULL;
         json_variant *v = NULL;
         size_t n = 0;
+        int r;
 
 	assert(string);
         assert(*rv == NULL);
 
-        if (0 > json_tokens(string, strlen(string), &s, &n))
+        r = json_tokens(string, strlen(string), &s, &n);
+        if (r < 0)
 		return -EBADMSG;
 
-        if (0 > json_parse_tokens(s, n, &v))
+        r = json_parse_tokens(s, n, &v);
+        if (r < 0)
 		return -EBADMSG;
 
         *rv = v;

@@ -134,7 +134,7 @@ int pull_make_local_copy(const char *final, const char *image_root, const char *
                 if (r < 0)
                         return log_error_errno(r, "Failed to copy image: %m");
         } else if (r < 0)
-                return log_error_errno(r, "Failed to create local image: %m\n%s\n%s", final, p);
+                return log_error_errno(r, "Failed to create local image: %m");
 
         log_info("Created new local image '%s'.", local);
 

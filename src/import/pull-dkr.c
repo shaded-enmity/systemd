@@ -461,7 +461,7 @@ static bool dkr_pull_is_done(DkrPull *i) {
         return true;
 }
 
-static int dkr_pull_make_local_copy(DkrPull *i) {
+static int dkr_pull_make_local_copy(DkrPull *i, enum PullStrategy strategy) {
         int r;
         char *p = NULL;
 
@@ -476,11 +476,12 @@ static int dkr_pull_make_local_copy(DkrPull *i) {
                         return log_oom();
         }
 
-        r = path_get_parent(i->image_root, &p);
-        if (r < 0)
-                return r;
+        if (strategy == PULL_V2) {
+                r = path_get_parent(i->image_root, &p);
+                if (r < 0)
+                        return r;
+        }
 
-        log_info("Old: %s\nNew: %s", i->image_root, p);
         r = pull_make_local_copy(i->final_path, p, i->local, i->force_local);
         if (r < 0)
                 return r;
@@ -783,8 +784,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 assert(!i->layer_job);
 
                 buf = strndup((const char *)j->payload, j->payload_size);
-
-                if (0 > json_parse(buf, &doc)) {
+                r = json_parse(buf, &doc);
+                if (r < 0) {
                         r = -EBADMSG;
                         log_error("Unable to parse bearer token\n%s", j->payload);
                         goto finish;
@@ -835,7 +836,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
                 assert(!i->layer_job);
 
-                if (0 > json_parse((const char *)j->payload, &doc)) {
+                r = json_parse((const char *)j->payload, &doc);
+                if (r < 0) {
                         r = -EBADMSG;
                         log_error("Invalid JSON Manifest");
                         goto finish;
@@ -895,7 +897,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
                 e = json_variant_element(e, 0);
                 e = json_variant_value(e, "v1Compatibility");
-                if (0 > json_parse(json_variant_string(e), &compat)) {
+                r = json_parse(json_variant_string(e), &compat);
+                if (r < 0) {
                         r = -EBADMSG;
                         log_error("Invalid v1Compatibility JSON");
                         goto finish;
@@ -975,7 +978,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
         dkr_pull_report_progress(i, DKR_COPYING);
 
-        r = dkr_pull_make_local_copy(i);
+        r = dkr_pull_make_local_copy(i, PULL_V2);
         if (r < 0)
                 goto finish;
 
@@ -1202,7 +1205,7 @@ static void dkr_pull_job_on_finished(PullJob *j) {
 
         dkr_pull_report_progress(i, DKR_COPYING);
 
-        r = dkr_pull_make_local_copy(i);
+        r = dkr_pull_make_local_copy(i, PULL_V1);
         if (r < 0)
                 goto finish;
 
