@@ -89,10 +89,9 @@ struct DkrPull {
 #define HEADER_TOKEN "X-Do" /* the HTTP header for the auth token */ "cker-Token:"
 #define HEADER_REGISTRY "X-Do" /* the HTTP header for the registry */ "cker-Endpoints:"
 #define HEADER_DIGEST "Do" /* the HTTP header for the manifest digest */ "cker-Content-Digest:"
-#define USER_AGENT_V2 "User-Agent: do" /* otherwise we get load-balanced(!) to a V1 registyry */ "cker/1.6.0"
-#define BEARER_REALM "https://auth.doc" /* */ "ker.io/token"
-#define BEARER_SERVICE "registry.doc" /* */ "ker.io"
-#define VOID_LAYER "sha256:efcb65363d18569a0eb1f77f333b3cbb386ccbb44cf4f43e21e649909b329fff"
+#define HEADER_USER_AGENT_V2 "User-Agent: do" /* otherwise we get load-balanced(!) to a V1 registyry */ "cker/1.6.0"
+#define HEADER_BEARER_REALM "https://auth.doc" /* URL which we query for a bearer token */ "ker.io/token"
+#define HEADER_BEARER_SERVICE "registry.doc" /* the service we query the token for */ "ker.io"
 
 #define LAYERS_MAX 2048
 
@@ -422,7 +421,7 @@ static int dkr_pull_add_token(DkrPull *i, PullJob *j) {
 }
 
 static int dkr_pull_add_bearer_token(DkrPull *i, PullJob *j) {
-        const char *t;
+        const char *t = NULL;
 
         assert(i);
         assert(j);
@@ -430,7 +429,7 @@ static int dkr_pull_add_bearer_token(DkrPull *i, PullJob *j) {
         if (i->response_token)
                 t = strjoina("Authorization: Bearer ", i->response_token);
 
-        j->request_header = curl_slist_new(USER_AGENT_V2, "Accept: application/json", t, NULL);
+        j->request_header = curl_slist_new(HEADER_USER_AGENT_V2, "Accept: application/json", t, NULL);
         if (!j->request_header)
                 return -ENOMEM;
 
@@ -750,7 +749,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 log_info("Index lookup succeeded, directed to registry %s.", i->response_registries[0]);
                 dkr_pull_report_progress(i, DKR_RESOLVING);
 
-                url = strjoina(BEARER_REALM, "?scope=", "repository:", i->name, ":pull", "&service=", BEARER_SERVICE);
+                url = strjoina(HEADER_BEARER_REALM, "?scope=repository:", i->name, ":pull&service=", HEADER_BEARER_SERVICE);
                 r = pull_job_new(&i->tags_job, url, i->glue, i);
                 if (r < 0) {
                         log_error_errno(r, "Failed to allocate tags job: %m");
@@ -841,50 +840,44 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         goto finish;
                 }
 
-                /*log_info("===============================================================");
-                printf("%s\n", (const char *)j->payload);
-                log_info("===============================================================");*/
                 log_info("JSON manifest with schema v%"PRIi64" for %s parsed!",
                                 json_variant_integer(json_variant_value(doc, "schemaVersion")),
                                 json_variant_string(json_variant_value(doc, "name")));
 
                 for (unsigned z = 0; z < e->size; z++) {
                         json_variant *f = json_variant_element(e, z), *g = NULL;
-                        const char* layer;
+                        const char *layer, *hash, *value;
                         if (f->type != JSON_VARIANT_OBJECT) {
                                 r = -EBADMSG;
                                 goto finish;
                         }
 
                         g = json_variant_value(f, "blobSum");
+
                         layer = json_variant_string(g);
-                        if (strcmp(layer, VOID_LAYER) != 0) {
-                                const char *hash, *value;
-                                hash = strchr(layer, ':');
-                                if (!hash) {
-                                        r = -EBADMSG;
-                                        goto finish;
-                                }
-
-                                value = strdupa(hash + 1);
-                                hash = strndupa(layer, hash - layer);
-
-                                if (strcmp(hash, "sha256") != 0 || !in_charset(value, "1234567890abcdef")) {
-                                        r = -EBADMSG;
-                                        goto finish;
-
-                                }
-
-                                if (!GREEDY_REALLOC(ancestry, allocated, size + 2)) {
-                                        log_oom();
-                                        goto finish;
-                                }
-
-                                ancestry[size] = strdup(layer);
-                                ancestry[size+1] = NULL;
-                                size += 1;
-                                //log_info(" -- %" PRIu64 ". %s", size, layer);
+                        hash = strchr(layer, ':');
+                        if (!hash) {
+                                r = -EBADMSG;
+                                goto finish;
                         }
+
+                        value = strdupa(hash + 1);
+                        hash = strndupa(layer, hash - layer);
+
+                        if (strcmp(hash, "sha256") != 0 || !in_charset(value, "1234567890abcdef")) {
+                                r = -EBADMSG;
+                                goto finish;
+
+                        }
+
+                        if (!GREEDY_REALLOC(ancestry, allocated, size + 2)) {
+                                log_oom();
+                                goto finish;
+                        }
+
+                        ancestry[size] = strdup(layer);
+                        ancestry[size+1] = NULL;
+                        size += 1;
                 }
 
                 e = json_variant_value(doc, "history");
@@ -908,7 +901,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 i->n_ancestry = strv_length(i->ancestry);
                 i->current_ancestry = 0;
                 i->id = strdup(i->ancestry[0]);
-                path = strjoin(i->image_root, "/.dkr-", json_variant_string(e), NULL);
+                path = strjoin(i->image_root, "/.dkr-", json_variant_string(e), NULL); // TODO: Fix!
                 free(i->image_root);
                 i->image_root = path;
                 ancestry = NULL;
