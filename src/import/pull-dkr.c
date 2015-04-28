@@ -840,7 +840,13 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         r = -EBADMSG;
                         goto finish;
                 }
-                log_info("JSON Manifest v%"PRIi64" for %s parsed!",
+
+                log_info("===============================================================");
+                printf("%s\n", (const char *)j->payload);
+                log_info("===============================================================");
+
+
+                log_info("JSON manifest with schema v%"PRIi64" for %s parsed!",
                                 json_variant_integer(json_variant_value(doc, "schemaVersion")),
                                 json_variant_string(json_variant_value(doc, "name")));
 
