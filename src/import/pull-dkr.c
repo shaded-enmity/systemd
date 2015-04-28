@@ -916,7 +916,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 log_info("Required layers:\n");
                 STRV_FOREACH(k, i->ancestry)
                         log_info("\t%s", *k);
-                log_info("\nProvenance:\n  ImageID: %s\n  Digest:  %s", json_variant_string(e), i->response_digest);
+                log_info("\nProvenance:\n\tImageID: %s\n\tDigest:  %s", json_variant_string(e), i->response_digest);
 
                 dkr_pull_report_progress(i, DKR_DOWNLOADING);
 
