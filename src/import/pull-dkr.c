@@ -845,7 +845,6 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 printf("%s\n", (const char *)j->payload);
                 log_info("===============================================================");
 
-
                 log_info("JSON manifest with schema v%"PRIi64" for %s parsed!",
                                 json_variant_integer(json_variant_value(doc, "schemaVersion")),
                                 json_variant_string(json_variant_value(doc, "name")));
@@ -908,7 +907,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 log_info("Provenance:\n  ImageID: %s\n  Digest:  %s", json_variant_string(e), i->response_digest);
 
                 strv_free(i->ancestry);
-                i->ancestry = strv_uniq(ancestry);
+                i->ancestry = strv_reverse(strv_uniq(ancestry));
                 i->n_ancestry = strv_length(i->ancestry);
                 i->current_ancestry = 0;
                 i->id = strdup(i->ancestry[0]);
