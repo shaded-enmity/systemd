@@ -846,7 +846,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
                 for (unsigned z = 0; z < e->size; z++) {
                         json_variant *f = json_variant_element(e, z), *g = NULL;
-                        const char* layer;
+                        const char *layer, *hash, *value;
                         if (f->type != JSON_VARIANT_OBJECT) {
                                 r = -EBADMSG;
                                 goto finish;
@@ -855,7 +855,6 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         g = json_variant_value(f, "blobSum");
 
                         layer = json_variant_string(g);
-                        const char *hash, *value;
                         hash = strchr(layer, ':');
                         if (!hash) {
                                 r = -EBADMSG;
