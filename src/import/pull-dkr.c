@@ -463,6 +463,7 @@ static bool dkr_pull_is_done(DkrPull *i) {
 
 static int dkr_pull_make_local_copy(DkrPull *i) {
         int r;
+        char *p = NULL;
 
         assert(i);
 
@@ -475,7 +476,12 @@ static int dkr_pull_make_local_copy(DkrPull *i) {
                         return log_oom();
         }
 
-        r = pull_make_local_copy(i->final_path, i->image_root, i->local, i->force_local);
+        r = path_get_parent(i->image_root, &p);
+        if (r < 0)
+                return r;
+
+        log_info("Old: %s\nNew: %s", i->image_root, p);
+        r = pull_make_local_copy(i->final_path, p, i->local, i->force_local);
         if (r < 0)
                 return r;
 
