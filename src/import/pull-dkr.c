@@ -907,7 +907,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 e = json_variant_value(compat, "id");
 
                 strv_free(i->ancestry);
-                i->ancestry = strv_reverse(strv_uniq(ancestry));
+                //i->ancestry = strv_reverse(strv_uniq(ancestry));
+                i->ancestry = strv_uniq(ancestry);
                 i->n_ancestry = strv_length(i->ancestry);
                 i->current_ancestry = 0;
                 i->id = strdup(i->ancestry[0]);
