@@ -150,6 +150,25 @@ int raw_strip_suffixes(const char *p, char **ret) {
         return 0;
 }
 
+bool dkr_ref_is_valid(const char *ref) {
+        const char *colon;
+
+        if (isempty(ref))
+                return false;
+
+        colon = strchr(ref, ':');
+        if (!colon)
+                return filename_is_valid(ref);
+
+        else if (!startswith(ref, "sha256"))
+                return false;
+
+        else if (!in_charset(colon + 1, "0123456789abcdef"))
+                return false;
+
+        return true;
+}
+
 bool dkr_name_is_valid(const char *name) {
         const char *slash, *p;
 
