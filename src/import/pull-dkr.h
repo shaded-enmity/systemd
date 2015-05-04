@@ -24,6 +24,52 @@
 #include "sd-event.h"
 #include "util.h"
 
+enum PullStrategy { PULL_V1, PULL_V2 };
+
+typedef struct DkrSignature {
+        char *curve;
+
+        char *key_id;
+        char *key_type;
+
+        char *x;
+        char *y;
+
+        char *algorithm;
+
+        char *signature;
+        char *protected;
+} DkrSignature;
+
+//typedef struct DkrHistory {
+//      char *image_id;
+//      char *parent_id;
+//} DkrHistory;
+
+typedef struct DkrManifest {
+        char *name;
+        char *tag;
+        char *architecture;
+
+        unsigned schema_version;
+
+        char **fs_layers;
+
+        //DkrHistory *history;
+
+        DkrSignature *signature;
+} DkrManifest;
+
+int dkr_signature_new(DkrSignature **signature, const char* raw_bytes);
+DkrSignature* dkr_signature_unref(DkrSignature *);
+
+DEFINE_TRIVIAL_CLEANUP_FUNC(DkrSignature*, dkr_signature_unref);
+
+int dkr_manifest_new(DkrManifest **manifest, const char* raw_bytes);
+DkrManifest* dkr_manifest_unref(DkrManifest *);
+
+DEFINE_TRIVIAL_CLEANUP_FUNC(DkrManifest*, dkr_manifest_unref);
+
 typedef struct DkrPull DkrPull;
 
 typedef void (*DkrPullFinished)(DkrPull *pull, int error, void *userdata);
@@ -33,4 +79,4 @@ DkrPull* dkr_pull_unref(DkrPull *pull);
 
 DEFINE_TRIVIAL_CLEANUP_FUNC(DkrPull*, dkr_pull_unref);
 
-int dkr_pull_start(DkrPull *pull, const char *name, const char *tag, const char *local, bool force_local);
+int dkr_pull_start(DkrPull *pull, const char *name, const char *tag, const char *local, bool force_local, enum PullStrategy strategy);
