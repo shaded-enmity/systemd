@@ -24,6 +24,7 @@
 #include "sd-event.h"
 #include "util.h"
 
+enum PullStrategy { PULL_V1, PULL_V2 };
 typedef struct DkrPull DkrPull;
 
 typedef void (*DkrPullFinished)(DkrPull *pull, int error, void *userdata);
@@ -33,4 +34,4 @@ DkrPull* dkr_pull_unref(DkrPull *pull);
 
 DEFINE_TRIVIAL_CLEANUP_FUNC(DkrPull*, dkr_pull_unref);
 
-int dkr_pull_start(DkrPull *pull, const char *name, const char *tag, const char *local, bool force_local);
+int dkr_pull_start(DkrPull *pull, const char *name, const char *tag, const char *local, bool force_local, enum PullStrategy strategy);
