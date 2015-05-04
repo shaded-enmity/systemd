@@ -22,6 +22,7 @@
 ***/
 
 #include <stdbool.h>
+#include "util.h"
 
 enum {
         JSON_END,
@@ -38,12 +39,50 @@ enum {
         JSON_NULL,
 };
 
+enum {
+        JSON_VARIANT_CONTROL,
+        JSON_VARIANT_STRING,
+        JSON_VARIANT_INTEGER,
+        JSON_VARIANT_BOOLEAN,
+        JSON_VARIANT_REAL,
+        JSON_VARIANT_ARRAY,
+        JSON_VARIANT_OBJECT,
+        JSON_VARIANT_NULL
+};
+
 union json_value {
         bool boolean;
         double real;
         intmax_t integer;
 };
 
+typedef struct json_variant {
+        union {
+                char *string;
+                struct json_variant *obj;
+                union json_value value;
+        };
+        int type;
+        unsigned size;
+} json_variant;
+
+json_variant *json_variant_new(int json_type);
+json_variant *json_variant_unref(json_variant *);
+json_variant **json_variant_array_unref(json_variant **variant);
+DEFINE_TRIVIAL_CLEANUP_FUNC(json_variant *, json_variant_unref);
+DEFINE_TRIVIAL_CLEANUP_FUNC(json_variant **, json_variant_array_unref);
+#define _cleanup_jsonunref_ _cleanup_(json_variant_unrefp)
+#define _cleanup_jsonarrayunref_ _cleanup_(json_variant_array_unrefp)
+
+char *json_variant_string(json_variant *);
+bool json_variant_bool(json_variant *);
+intmax_t json_variant_integer(json_variant *);
+double json_variant_real(json_variant *);
+
+json_variant *json_variant_element(json_variant *, unsigned index);
+json_variant *json_variant_value(json_variant *, const char *key);
+
 #define JSON_VALUE_NULL ((union json_value) {})
 
 int json_tokenize(const char **p, char **ret_string, union json_value *ret_value, void **state, unsigned *line);
+int json_parse(const char *string, json_variant **rv);
