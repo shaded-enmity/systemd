@@ -157,11 +157,8 @@ bool dkr_ref_is_valid(const char *ref) {
                 return false;
 
         colon = strchr(ref, ':');
-        if (!colon) // it's a tag
-                if (filename_is_valid(ref))
-                        return true;
-                else
-                        return false;
+        if (!colon)
+                return filename_is_valid(ref);
 
         else if (!startswith(ref, "sha256"))
                 return false;
