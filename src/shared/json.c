@@ -90,9 +90,8 @@ static json_variant *json_raw_unref(json_variant *variant, size_t size) {
         if (!variant)
                 return NULL;
 
-        for (size_t i = 0; i < size; ++i) {
+        for (size_t i = 0; i < size; ++i)
                 json_variant_unref_inner(&variant[i]);
-        }
 
         free(variant);
         return NULL;
@@ -103,9 +102,8 @@ static json_variant *json_object_unref(json_variant *variant) {
         if (!variant->obj)
                 return NULL;
 
-        for (unsigned i = 0; i < variant->size; ++i) {
+        for (unsigned i = 0; i < variant->size; ++i)
                 json_variant_unref_inner(&variant->obj[i]);
-        }
 
         free(variant->obj);
         return NULL;
@@ -639,34 +637,29 @@ static int json_scoped_parse(json_variant **tokens, size_t *i, size_t n, json_va
                 int r;
 
                 if (stopper) {
-                        if (state != STATE_COMMA && size > 0) {
+                        if (state != STATE_COMMA && size > 0)
                                 goto error;
-                        }
 
                         goto out;
                 }
 
                 if (state == STATE_KEY) {
-                        if (var->type != JSON_VARIANT_STRING) {
+                        if (var->type != JSON_VARIANT_STRING)
                                 goto error;
-                        }
                         else {
                                 key = var;
                                 state = STATE_COLON;
                         }
                 }
                 else if (state == STATE_COLON) {
-                        if (key == NULL) {
+                        if (key == NULL)
                                 goto error;
-                        }
 
-                        if (json_is_value(var)) {
+                        if (json_is_value(var))
                                 goto error;
-                        }
 
-                        if (var->value.integer != JSON_COLON) {
+                        if (var->value.integer != JSON_COLON)
                                 goto error;
-                        }
 
                         state = STATE_VALUE;
                 }
@@ -709,13 +702,11 @@ static int json_scoped_parse(json_variant **tokens, size_t *i, size_t n, json_va
                         state = STATE_COMMA;
                 }
                 else if (state == STATE_COMMA) {
-                        if (json_is_value(var)) {
+                        if (json_is_value(var))
                                 goto error;
-                        }
 
-                        if (var->value.integer != JSON_COMMA) {
+                        if (var->value.integer != JSON_COMMA)
                                 goto error;
-                        }
 
                         key = NULL;
                         value = NULL;

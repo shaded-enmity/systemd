@@ -817,11 +817,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         goto finish;
                 }
 
-                if (i->response_token)
-                        free(i->response_token);
-                i->response_token = strdup(json_variant_string(e));
-                if (!i->response_token) {
-                        r = -ENOMEM;
+                r = free_and_strdup(&i->response_token, json_variant_string(e));
+                if (r < 0) {
                         log_oom();
                         goto finish;
                 }
