@@ -798,9 +798,14 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 assert(!i->layer_job);
 
                 buf = strndup((const char *)j->payload, j->payload_size);
+                if (!buf) {
+                        r = -ENOMEM;
+                        log_oom();
+                        goto finish;
+                }
+
                 r = json_parse(buf, &doc);
                 if (r < 0) {
-                        r = -EBADMSG;
                         log_error("Unable to parse bearer token\n%s", j->payload);
                         goto finish;
                 }
@@ -815,6 +820,11 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 if (i->response_token)
                         free(i->response_token);
                 i->response_token = strdup(json_variant_string(e));
+                if (!i->response_token) {
+                        r = -ENOMEM;
+                        log_oom();
+                        goto finish;
+                }
 
                 url = strjoina(PROTOCOL_PREFIX, i->response_registries[0], "/v2/", i->name, "/manifests/", i->reference);
                 r = pull_job_new(&i->ancestry_job, url, i->glue, i);
@@ -858,6 +868,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
                 e = json_variant_value(doc, "fsLayers");
                 if (!e || e->type != JSON_VARIANT_ARRAY) {
+                        r = -EBADMSG;
                         goto finish;
                 }
 
@@ -892,11 +903,18 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         }
 
                         if (!GREEDY_REALLOC(ancestry, allocated, size + 2)) {
+                                r = -ENOMEM;
                                 log_oom();
                                 goto finish;
                         }
 
                         ancestry[size] = strdup(layer);
+                        if (!ancestry[size]) {
+                                r = -ENOMEM;
+                                log_oom();
+                                goto finish;
+                        }
+
                         ancestry[size+1] = NULL;
                         size += 1;
                 }
@@ -922,7 +940,17 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 i->n_ancestry = strv_length(i->ancestry);
                 i->current_ancestry = 0;
                 i->id = strdup(i->ancestry[i->n_ancestry - 1]);
+                if (!i->id) {
+                        r = -ENOMEM;
+                        log_oom();
+                        goto finish;
+                }
                 path = strjoin(i->image_root, "/.dkr-", json_variant_string(e), NULL);
+                if (!path) {
+                        r = -ENOMEM;
+                        log_oom();
+                        goto finish;
+                }
                 free(i->image_root);
                 i->image_root = path;
                 ancestry = NULL;

@@ -807,6 +807,9 @@ static int json_tokens(const char *string, size_t size, json_variant ***tokens, 
                                         return r;
                                 var->size = strlen(rstr);
                                 var->string = strdup(rstr);
+                                if (!var->string) {
+                                        return -ENOMEM;
+                                }
                                 break;
                         case JSON_INTEGER:
                                 r = json_variant_new(&var, JSON_VARIANT_INTEGER);
