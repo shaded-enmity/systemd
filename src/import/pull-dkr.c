@@ -93,9 +93,6 @@ struct DkrPull {
 #define HEADER_TOKEN "X-Do" /* the HTTP header for the auth token */ "cker-Token:"
 #define HEADER_REGISTRY "X-Do" /* the HTTP header for the registry */ "cker-Endpoints:"
 #define HEADER_DIGEST "Do" /* the HTTP header for the manifest digest */ "cker-Content-Digest:"
-#define HEADER_BEARER_REALM "https://auth.doc" /* URL which we query for a bearer token */ "ker.io/token"
-#define HEADER_BEARER_SERVICE "registry.doc" /* the service we query the token for */ "ker.io"
-
 #define LAYERS_MAX 2048
 
 static void dkr_pull_job_on_finished(PullJob *j);
@@ -1270,7 +1267,6 @@ static int get_protocol_address(char **protocol, char **address, const char *url
 
 int dkr_pull_start(DkrPull *i, const char *name, const char *reference, const char *local, bool force_local, DkrPullVersion version) {
         const char *url;
-        char *cleared;
         int r;
 
         assert(i);
