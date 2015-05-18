@@ -794,7 +794,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 const char *url;
                 _cleanup_free_ const char *buf;
                 _cleanup_jsonunref_ JsonVariant *doc = NULL;
-                json_variant *e = NULL;
+                JsonVariant *e = NULL;
 
                 assert(!i->ancestry_job);
                 assert(!i->json_job);
