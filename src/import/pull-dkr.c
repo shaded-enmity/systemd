@@ -851,7 +851,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
                 _cleanup_jsonunref_ JsonVariant *doc = NULL;
                 _cleanup_jsonunref_ JsonVariant *compat = NULL;
-                json_variant *e = NULL;
+                JsonVariant *e = NULL;
                 _cleanup_strv_free_ char **ancestry = NULL;
                 size_t allocated = 0, size = 0;
                 char *path = NULL, **k = NULL;
