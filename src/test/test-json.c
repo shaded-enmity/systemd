@@ -73,7 +73,7 @@ static void test_one(const char *data, ...) {
 }
 
 static void test_file(const char *data) {
-        json_variant *v = NULL;
+        JsonVariant *v = NULL;
         int r = json_parse(data, &v);
 
         assert_se(r == 0);
