@@ -463,7 +463,7 @@ static bool dkr_pull_is_done(DkrPull *i) {
         return true;
 }
 
-static int dkr_pull_make_local_copy(DkrPull *i, DkrPullVersion vesion) {
+static int dkr_pull_make_local_copy(DkrPull *i, DkrPullVersion version) {
         int r;
         _cleanup_free_ char *p = NULL;
 
