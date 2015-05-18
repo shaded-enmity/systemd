@@ -310,7 +310,7 @@ static int pull_dkr(int argc, char *argv[], void *userdata) {
         if (r < 0)
                 return log_error_errno(r, "Failed to allocate puller: %m");
 
-        r = dkr_pull_start(pull, name, reference, local, arg_force, PULL_V2);
+        r = dkr_pull_start(pull, name, reference, local, arg_force, DKR_PULL_V2);
         if (r < 0)
                 return log_error_errno(r, "Failed to pull image: %m");
 
