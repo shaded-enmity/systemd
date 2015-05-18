@@ -150,6 +150,14 @@ int raw_strip_suffixes(const char *p, char **ret) {
         return 0;
 }
 
+bool dkr_digest_is_valid(const char *digest) {
+        /* 7 chars for prefix, 64 chars for the digest itself */
+        if (strlen(digest) != 71)
+                return false;
+
+        return startswith(digest, "sha256:") && in_charset(digest + 7, "0123456789abcdef");
+}
+
 bool dkr_ref_is_valid(const char *ref) {
         const char *colon;
 
@@ -160,13 +168,7 @@ bool dkr_ref_is_valid(const char *ref) {
         if (!colon)
                 return filename_is_valid(ref);
 
-        else if (!startswith(ref, "sha256"))
-                return false;
-
-        else if (!in_charset(colon + 1, "0123456789abcdef"))
-                return false;
-
-        return true;
+        return dkr_digest_is_valid(ref);
 }
 
 bool dkr_name_is_valid(const char *name) {

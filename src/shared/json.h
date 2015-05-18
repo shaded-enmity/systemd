@@ -39,7 +39,7 @@ enum {
         JSON_NULL,
 };
 
-enum {
+typedef enum {
         JSON_VARIANT_CONTROL,
         JSON_VARIANT_STRING,
         JSON_VARIANT_INTEGER,
@@ -48,7 +48,7 @@ enum {
         JSON_VARIANT_ARRAY,
         JSON_VARIANT_OBJECT,
         JSON_VARIANT_NULL
-};
+} JsonVariantType;
 
 union json_value {
         bool boolean;
@@ -59,27 +59,28 @@ union json_value {
 typedef struct json_variant {
         union {
                 char *string;
-                struct json_variant *obj;
+                struct json_variant *objects;
                 union json_value value;
         };
-        int type;
+        JsonVariantType type;
         unsigned size;
-} json_variant;
+} JsonVariant;
 
-int json_variant_new(json_variant **ret, int json_type);
-json_variant *json_variant_unref(json_variant *);
-DEFINE_TRIVIAL_CLEANUP_FUNC(json_variant *, json_variant_unref);
+int json_variant_new(JsonVariant **ret, JsonVariantType type);
+JsonVariant *json_variant_unref(JsonVariant *);
+DEFINE_TRIVIAL_CLEANUP_FUNC(JsonVariant *, json_variant_unref);
 #define _cleanup_jsonunref_ _cleanup_(json_variant_unrefp)
 
-char *json_variant_string(json_variant *);
-bool json_variant_bool(json_variant *);
-intmax_t json_variant_integer(json_variant *);
-double json_variant_real(json_variant *);
+char *json_variant_string(JsonVariant *);
+bool json_variant_bool(JsonVariant *);
+intmax_t json_variant_integer(JsonVariant *);
+double json_variant_real(JsonVariant *);
 
-json_variant *json_variant_element(json_variant *, unsigned index);
-json_variant *json_variant_value(json_variant *, const char *key);
+JsonVariant *json_variant_element(JsonVariant *, unsigned index);
+JsonVariant *json_variant_value(JsonVariant *, const char *key);
 
 #define JSON_VALUE_NULL ((union json_value) {})
 
 int json_tokenize(const char **p, char **ret_string, union json_value *ret_value, void **state, unsigned *line);
-int json_parse(const char *string, json_variant **rv);
+int json_parse(const char *string, JsonVariant **rv);
+int json_parse_measure(const char *string, size_t *size);

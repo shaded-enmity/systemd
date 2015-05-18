@@ -51,6 +51,9 @@ struct DkrPull {
         sd_event *event;
         CurlGlue *glue;
 
+        char *index_protocol;
+        char *index_address;
+
         char *index_url;
         char *image_root;
 
@@ -90,7 +93,6 @@ struct DkrPull {
 #define HEADER_TOKEN "X-Do" /* the HTTP header for the auth token */ "cker-Token:"
 #define HEADER_REGISTRY "X-Do" /* the HTTP header for the registry */ "cker-Endpoints:"
 #define HEADER_DIGEST "Do" /* the HTTP header for the manifest digest */ "cker-Content-Digest:"
-#define HEADER_USER_AGENT_V2 "User-Agent: do" /* otherwise we get load-balanced(!) to a V1 registyry */ "cker/1.6.0"
 #define HEADER_BEARER_REALM "https://auth.doc" /* URL which we query for a bearer token */ "ker.io/token"
 #define HEADER_BEARER_SERVICE "registry.doc" /* the service we query the token for */ "ker.io"
 
@@ -125,9 +127,10 @@ DkrPull* dkr_pull_unref(DkrPull *i) {
         free(i->reference);
         free(i->id);
         free(i->response_token);
-        free(i->response_registries);
         strv_free(i->ancestry);
         free(i->final_path);
+        free(i->index_address);
+        free(i->index_protocol);
         free(i->index_url);
         free(i->image_root);
         free(i->local);
@@ -171,7 +174,7 @@ int dkr_pull_new(
         if (!i->index_url)
                 return -ENOMEM;
 
-        e = endswith(i->index_url, "/");
+        e = endswith(i->index_address, "/");
         if (e)
                 *e = 0;
 
@@ -429,8 +432,10 @@ static int dkr_pull_add_bearer_token(DkrPull *i, PullJob *j) {
 
         if (i->response_token)
                 t = strjoina("Authorization: Bearer ", i->response_token);
+        else
+                return -EINVAL;
 
-        j->request_header = curl_slist_new(HEADER_USER_AGENT_V2, "Accept: application/json", t, NULL);
+        j->request_header = curl_slist_new("Accept: application/json", t, NULL);
         if (!j->request_header)
                 return -ENOMEM;
 
@@ -461,7 +466,7 @@ static bool dkr_pull_is_done(DkrPull *i) {
         return true;
 }
 
-static int dkr_pull_make_local_copy(DkrPull *i, enum PullStrategy strategy) {
+static int dkr_pull_make_local_copy(DkrPull *i, DkrPullVersion vesion) {
         int r;
         _cleanup_free_ char *p = NULL;
 
@@ -476,7 +481,7 @@ static int dkr_pull_make_local_copy(DkrPull *i, enum PullStrategy strategy) {
                         return log_oom();
         }
 
-        if (strategy == PULL_V2) {
+        if (version == DKR_PULL_V2) {
                 r = path_get_parent(i->image_root, &p);
                 if (r < 0)
                         return r;
@@ -486,10 +491,10 @@ static int dkr_pull_make_local_copy(DkrPull *i, enum PullStrategy strategy) {
         if (r < 0)
                 return r;
 
-        if (strategy == PULL_V2) {
+        if (version == DKR_PULL_V2) {
                 char **k = NULL;
                 STRV_FOREACH(k, i->ancestry) {
-                        char *d = strjoina(i->image_root, "/.dkr-", *k, NULL);
+                        _cleanup_free_ char *d = strjoin(i->image_root, "/.dkr-", *k, NULL);
                         r = btrfs_subvol_remove(d, false);
                         if (r < 0)
                                return r;
@@ -771,7 +776,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 log_info("Index lookup succeeded, directed to registry %s.", i->response_registries[0]);
                 dkr_pull_report_progress(i, DKR_RESOLVING);
 
-                url = strjoina(HEADER_BEARER_REALM, "?scope=repository:", i->name, ":pull&service=", HEADER_BEARER_SERVICE);
+                url = strjoina(i->index_protocol, "auth.", i->index_address, "/token",
+                               "?scope=repository:", i->name, ":pull&service=registry.", i->index_address);
                 r = pull_job_new(&i->tags_job, url, i->glue, i);
                 if (r < 0) {
                         log_error_errno(r, "Failed to allocate tags job: %m");
@@ -831,10 +837,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 }
 
                 r = dkr_pull_add_bearer_token(i, i->ancestry_job);
-                if (r != 0) {
-                        log_oom();
+                if (r < 0)
                         goto finish;
-                }
 
                 i->ancestry_job->on_finished = dkr_pull_job_on_finished_v2;
                 i->ancestry_job->on_progress = dkr_pull_job_on_progress;
@@ -884,19 +888,9 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         g = json_variant_value(f, "blobSum");
 
                         layer = json_variant_string(g);
-                        hash = strchr(layer, ':');
-                        if (!hash) {
+                        if (!dkr_digest_is_valid(layer)) {
                                 r = -EBADMSG;
                                 goto finish;
-                        }
-
-                        value = strdupa(hash + 1);
-                        hash = strndupa(layer, hash - layer);
-
-                        if (!streq(hash, "sha256") || !in_charset(value, "1234567890abcdef")) {
-                                r = -EBADMSG;
-                                goto finish;
-
                         }
 
                         if (!GREEDY_REALLOC(ancestry, allocated, size + 2)) {
@@ -1014,7 +1008,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
         dkr_pull_report_progress(i, DKR_COPYING);
 
-        r = dkr_pull_make_local_copy(i, PULL_V2);
+        r = dkr_pull_make_local_copy(i, DKR_PULL_V2);
         if (r < 0)
                 goto finish;
 
@@ -1241,12 +1235,11 @@ static void dkr_pull_job_on_finished(PullJob *j) {
 
         dkr_pull_report_progress(i, DKR_COPYING);
 
-        r = dkr_pull_make_local_copy(i, PULL_V1);
+        r = dkr_pull_make_local_copy(i, DKR_PULL_V1);
         if (r < 0)
                 goto finish;
 
         r = 0;
-
 finish:
         if (i->on_finished)
                 i->on_finished(i, r, i->userdata);
@@ -1254,8 +1247,30 @@ finish:
                 sd_event_exit(i->event, r);
 }
 
-int dkr_pull_start(DkrPull *i, const char *name, const char *reference, const char *local, bool force_local, enum PullStrategy strategy) {
+static int get_protocol_address(char **protocol, char **address, const char *url) {
+        const char *sep = strstr(url, "://");
+        const char *a, *p;
+
+        if (!sep)
+                return -EINVAL;
+
+        p = strndup(url, (sep - url) + 3);
+        if (!p)
+                return log_oom();
+
+        a = strdup(sep + 3);
+        if (!a)
+                return log_oom();
+
+        *address = a;
+        *protocol = p;
+
+        return 0;
+}
+
+int dkr_pull_start(DkrPull *i, const char *name, const char *reference, const char *local, bool force_local, DkrPullVersion version) {
         const char *url;
+        char *cleared;
         int r;
 
         assert(i);
@@ -1274,6 +1289,12 @@ int dkr_pull_start(DkrPull *i, const char *name, const char *reference, const ch
 
         if (!reference)
                 reference = "latest";
+
+        free(i->index_protocol);
+        free(i->index_address);
+        r = get_protocol_address(&i->index_protocol, &i->index_address, i->index_url);
+        if (r < 0)
+                return r;
 
         r = free_and_strdup(&i->local, local);
         if (r < 0)
@@ -1297,7 +1318,7 @@ int dkr_pull_start(DkrPull *i, const char *name, const char *reference, const ch
         if (r < 0)
                 return r;
 
-        if (strategy == PULL_V1)
+        if (version == DKR_PULL_V1)
                 i->images_job->on_finished = dkr_pull_job_on_finished;
         else
                 i->images_job->on_finished = dkr_pull_job_on_finished_v2;
