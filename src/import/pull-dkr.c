@@ -171,7 +171,7 @@ int dkr_pull_new(
         if (!i->index_url)
                 return -ENOMEM;
 
-        e = endswith(i->index_address, "/");
+        e = endswith(i->index_url, "/");
         if (e)
                 *e = 0;
 
