@@ -875,7 +875,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                                 json_variant_string(json_variant_value(doc, "name")));
 
                 for (unsigned z = 0; z < e->size; z++) {
-                        json_variant *f = json_variant_element(e, z), *g = NULL;
+                        JsonVariant *f = json_variant_element(e, z), *g = NULL;
                         const char *layer, *hash, *value;
                         if (f->type != JSON_VARIANT_OBJECT) {
                                 r = -EBADMSG;
