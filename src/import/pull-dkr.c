@@ -876,7 +876,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
 
                 for (unsigned z = 0; z < e->size; z++) {
                         JsonVariant *f = json_variant_element(e, z), *g = NULL;
-                        const char *layer, *hash, *value;
+                        const char *layer;
                         if (f->type != JSON_VARIANT_OBJECT) {
                                 r = -EBADMSG;
                                 goto finish;
@@ -1246,7 +1246,7 @@ finish:
 
 static int get_protocol_address(char **protocol, char **address, const char *url) {
         const char *sep = strstr(url, "://");
-        const char *a, *p;
+        char *a, *p;
 
         if (!sep)
                 return -EINVAL;
