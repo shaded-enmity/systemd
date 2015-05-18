@@ -48,7 +48,7 @@ static int json_variant_deep_copy(JsonVariant *ret, JsonVariant *variant) {
                         return -ENOMEM;
         } else if (variant->type == JSON_VARIANT_ARRAY || variant->type == JSON_VARIANT_OBJECT) {
                 ret->objects = new0(JsonVariant, variant->size);
-                if (!ret->obj)
+                if (!ret->objects)
                         return -ENOMEM;
 
                 for (unsigned i = 0; i < variant->size; ++i) {
@@ -658,7 +658,7 @@ static int json_scoped_parse(JsonVariant **tokens, size_t *i, size_t n, JsonVari
                         state = STATE_VALUE;
                 }
                 else if (state == STATE_VALUE) {
-                        _cleanup_jsonunref_ json_variant* v = NULL;
+                        _cleanup_jsonunref_ JsonVariant *v = NULL;
                         size_t toadd = arr ? 1 : 2;
 
                         if (!json_is_value(var)) {
@@ -715,7 +715,7 @@ error:
 
 out:
         scope->size = size;
-        scope->obj = items;
+        scope->objects = items;
 
         return scope->type;
 }
