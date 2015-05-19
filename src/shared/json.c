@@ -43,7 +43,7 @@ static int json_variant_deep_copy(JsonVariant *ret, JsonVariant *variant) {
         ret->size = variant->size;
 
         if (variant->type == JSON_VARIANT_STRING) {
-                ret->string = strdup(variant->string, variant->size);
+                ret->string = strndup(variant->string, variant->size);
                 if (!ret->string)
                         return -ENOMEM;
         } else if (variant->type == JSON_VARIANT_ARRAY || variant->type == JSON_VARIANT_OBJECT) {
