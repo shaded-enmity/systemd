@@ -1245,19 +1245,30 @@ finish:
 }
 
 static int get_protocol_address(char **protocol, char **address, const char *url) {
-        const char *sep = strstr(url, "://");
+        const char *sep, *dot;
         char *a, *p;
 
+        sep = strstr(url, "://");
         if (!sep)
+                return -EINVAL;
+
+        dot = strrchr(url, ".");
+        if (!dot)
                 return -EINVAL;
 
         p = strndup(url, (sep - url) + 3);
         if (!p)
                 return log_oom();
 
+        dot = strrchr(dot, ".");
+        if (dot)
+                sel = dot + 1;
+
         a = strdup(sep + 3);
         if (!a)
                 return log_oom();
+
+        log_info("%s%s", p, a);
 
         *address = a;
         *protocol = p;
