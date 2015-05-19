@@ -88,6 +88,25 @@ static void test_file(const char *data, FileTest test) {
         json_variant_unref(v);
 }
 
+static bool test_1(JsonVariant *v) {
+        JsonVariant *p;
+        if (v->size != 6)
+                return false;
+
+        p = json_variant_value(v, "k");
+        if (!p || p->type != JSON_VARIANT_STRING)
+                return false;
+
+        if (!streq(json_variant_string(p), "v"))
+                return false;
+
+        p = json_variant_value(v, "foo");
+        if (!p || p->type != JSON_VARIANT_ARRAY)
+                return false;
+
+        return true;
+}
+
 int main(int argc, char *argv[]) {
 
         test_one("x", -EINVAL);
@@ -120,7 +139,7 @@ int main(int argc, char *argv[]) {
 
         test_one("[1, 2]", JSON_ARRAY_OPEN, JSON_INTEGER, 1, JSON_COMMA, JSON_INTEGER, 2, JSON_ARRAY_CLOSE, JSON_END);
 
-        test_file("{\"k\": \"v\", \"foo\": [1, 2, 3], \"bar\": {\"zap\": null}}", NULL);
+        test_file("{\"k\": \"v\", \"foo\": [1, 2, 3], \"bar\": {\"zap\": null}}", test_1);
         test_file("{\"mutant\": [1, null, \"1\", {\"1\": [1, \"1\"]}], \"blah\": 1.27}", NULL);
 
         return 0;
