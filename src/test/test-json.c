@@ -93,41 +93,32 @@ static void test_1(JsonVariant *v) {
         unsigned i;
 
         /* 3 keys + 3 values */
-        if (v->size != 6)
-                return false;
+        assert_se(v->size == 6);
 
         /* has k */
         p = json_variant_value(v, "k");
-        if (!p || p->type != JSON_VARIANT_STRING)
-                return false;
+        assert_se(p && p->type == JSON_VARIANT_STRING);
 
         /* k equals v */
-        if (!streq(json_variant_string(p), "v"))
-                return false;
+        assert_se(streq(json_variant_string(p), "v"));
 
         /* has foo */
         p = json_variant_value(v, "foo");
-        if (!p || p->type != JSON_VARIANT_ARRAY || p->size != 3)
-                return false;
+        assert_se(p && p->type == JSON_VARIANT_ARRAY && p->size == 3);
 
         /* check  foo[0] = 1, foo[1] = 2, foo[2] = 3 */
         for (i = 0; i < 3; ++i) {
                 q = json_variant_element(p, i);
-                if (!q || q->type != JSON_VARIANT_INTEGER || json_variant_integer(q) != (i+1))
-                        return false;
+                assert_se(q && q->type == JSON_VARIANT_INTEGER && json_variant_integer(q) == (i+1));
         }
 
         /* has bar */
         p = json_variant_value(v, "bar");
-        if (!p || p->type != JSON_VARIANT_OBJECT || p->size != 2)
-                return false;
+        assert_se(p && p->type == JSON_VARIANT_OBJECT && p->size == 2);
 
         /* zap is null */
         q = json_variant_value(p, "zap");
-        if (!q || q->type != JSON_VARIANT_NULL)
-                return false;
-
-        return true;
+        assert_se(q && q->type == JSON_VARIANT_NULL);
 }
 
 static void test_2(JsonVariant *v) {
