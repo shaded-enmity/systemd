@@ -1264,11 +1264,11 @@ static int get_protocol_address(char **protocol, char **address, const char *url
         while (dot > (sep + 3) && *dot != '.')
                 dot--;
 
-        a = strdup(sep + 3);
+        a = strdup(dot + 1);
         if (!a)
                 return log_oom();
 
-        log_info("%s%s [%s]", p, a, dot);
+        log_info("%s%s [%s]", p, a);
 
         *address = a;
         *protocol = p;
