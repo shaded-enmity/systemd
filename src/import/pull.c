@@ -35,7 +35,7 @@ static bool arg_force = false;
 static const char *arg_image_root = "/var/lib/machines";
 static ImportVerify arg_verify = IMPORT_VERIFY_SIGNATURE;
 static const char* arg_dkr_index_url = DEFAULT_DKR_INDEX_URL;
-static const DkrPullVersion arg_dkr_pull_version = DKR_PULL_V2;
+static DkrPullVersion arg_dkr_pull_version = DKR_PULL_V2;
 
 static int interrupt_signal_handler(sd_event_source *s, const struct signalfd_siginfo *si, void *userdata) {
         log_notice("Transfer aborted.");
