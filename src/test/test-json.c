@@ -133,19 +133,19 @@ static void test_2(JsonVariant *v) {
         assert_se(p && p->type == JSON_VARIANT_ARRAY && p->size == 4);
 
         /* mutant[0] == 1 */
-        q = json_variant_element(v, 0);
+        q = json_variant_element(p, 0);
         assert_se(q && q->type == JSON_VARIANT_INTEGER && json_variant_integer(q) == 1);
 
         /* mutant[1] == null */
-        q = json_variant_element(v, 1);
+        q = json_variant_element(p, 1);
         assert_se(q && q->type == JSON_VARIANT_NULL);
 
         /* mutant[2] == "1" */
-        q = json_variant_element(v, 2);
+        q = json_variant_element(p, 2);
         assert_se(q && q->type == JSON_VARIANT_STRING && streq(json_variant_string(q), "1"));
 
         /* mutant[3] == JSON_VARIANT_OBJECT */
-        q = json_variant_element(v, 3);
+        q = json_variant_element(p, 3);
         assert_se(q && q->type == JSON_VARIANT_OBJECT && q->size == 2);
 
         return true;
