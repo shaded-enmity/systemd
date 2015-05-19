@@ -882,9 +882,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         goto finish;
                 }
 
-                printf("<<<\n%s\n>>>", j->payload);
-
-                printf("\n#############################################\nManifest checksum: %s\n\n", digest);
+                printf("%s", j->payload);
 
                 r = json_parse((const char *)j->payload, &doc);
                 if (r < 0) {
