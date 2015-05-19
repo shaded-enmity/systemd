@@ -89,7 +89,9 @@ static void test_file(const char *data, FileTest test) {
 }
 
 static bool test_1(JsonVariant *v) {
-        JsonVariant *p;
+        JsonVariant *p, *q;
+        unsigned i;
+
         if (v->size != 6)
                 return false;
 
@@ -101,8 +103,14 @@ static bool test_1(JsonVariant *v) {
                 return false;
 
         p = json_variant_value(v, "foo");
-        if (!p || p->type != JSON_VARIANT_ARRAY)
+        if (!p || p->type != JSON_VARIANT_ARRAY || p->size != 3)
                 return false;
+
+        for (i = 0; i < 3; ++i) {
+                q = json_variant_element(p, i);
+                if (!q || q->type != JSON_VARIANT_INTEGER || json_variant_integer(q) != (i+1))
+                        return false;
+        }
 
         return true;
 }
