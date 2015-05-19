@@ -128,7 +128,7 @@ static void test_2(JsonVariant *v) {
         /* 2 keys + 2 values */
         assert_se(v->size == 4);
 
-        /* 4 values */
+        /* has mutant */
         p = json_variant_value(v, "mutant");
         assert_se(p && p->type == JSON_VARIANT_ARRAY && p->size == 4);
 
@@ -148,7 +148,9 @@ static void test_2(JsonVariant *v) {
         q = json_variant_element(p, 3);
         assert_se(q && q->type == JSON_VARIANT_OBJECT && q->size == 2);
 
-        return true;
+        /* has 1 */
+        q = json_variant_value(q, "1");
+        assert_se(q && q->type == JSON_VARIANT_ARRAY && q->size == 2);
 }
 
 int main(int argc, char *argv[]) {
