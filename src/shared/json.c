@@ -180,7 +180,7 @@ JsonVariant *json_variant_value(JsonVariant *variant, const char *key) {
 
         for (unsigned i = 0; i < variant->size; i += 2) {
                 JsonVariant *p = &variant->objects[i];
-                printf("\n<<< %s(%i) == %s\n", p->string, p->type == JSON_VARIANT_STRING, key);
+                printf("\n<<< %s(%i) == %s --> %i\n", p->string, p->type == JSON_VARIANT_STRING, key, streq(p->string, key));
                 if (p->type == JSON_VARIANT_STRING && streq(key, p->string)) {
                         printf("\n>>> %s\n", (&variant->objects[i+1])->string);
                         return &variant->objects[i + 1];
