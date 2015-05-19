@@ -841,11 +841,6 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 i->ancestry_job->on_progress = dkr_pull_job_on_progress;
                 i->ancestry_job->on_header = dkr_pull_job_on_header;
 
-                if (gcry_md_open(&i->ancestry_job->checksum_context, GCRY_MD_SHA256, 0)) {
-                        log_error_errno(r, "SHA256 failed: %m");
-                        r = -ENOSYS;
-                        goto finish;
-                }
 
                 r = pull_job_begin(i->ancestry_job);
                 if (r < 0) {
@@ -861,10 +856,33 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 _cleanup_strv_free_ char **ancestry = NULL;
                 size_t allocated = 0, size = 0;
                 char *path = NULL, **k = NULL;
+                _cleanup_free_ char *digest = NULL;
+                gcry_md_hd_t hd;
+                uint8_t *k;
 
                 assert(!i->layer_job);
 
-                printf("\n#############################################\nManifest checksum: %s\n\n", j->checksum);
+                if (gcry_md_open(&hd, GCRY_MD_SHA256, 0)) {
+                        log_error_errno(r, "SHA256 failed: %m");
+                        r = -ENOSYS;
+                        goto finish;
+                }
+                gcry_md_write(hd, j->payload, j->payload_size);
+
+                k = gcry_md_read(hd, GCRY_MD_SHA256);
+                if (!k) {
+                        log_error("Failed to get checksum.");
+                        r = -EIO;
+                        goto finish;
+                }
+
+                digest = hexmem(k, gcry_md_get_algo_dlen(GCRY_MD_SHA256));
+                if (!digest) {
+                        r = log_oom();
+                        goto finish;
+                }
+
+                printf("\n#############################################\nManifest checksum: %s\n\n", digest);
 
                 r = json_parse((const char *)j->payload, &doc);
                 if (r < 0) {
