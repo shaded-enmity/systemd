@@ -608,12 +608,10 @@ static bool json_is_value(JsonVariant *var) {
 }
 
 static int json_scoped_parse(JsonVariant **tokens, size_t *i, size_t n, JsonVariant *scope) {
-        void *e = NULL;
         bool arr = scope->type == JSON_VARIANT_ARRAY;
         int terminator = arr ? JSON_ARRAY_CLOSE : JSON_OBJECT_CLOSE;
         size_t allocated = 0, size = 0;
-        JsonVariant *key = NULL, *value = NULL;
-        JsonVariant *items = NULL;
+        JsonVariant *key = NULL, *value = NULL, *var = NULL, *items = NULL;
         enum {
                 STATE_KEY,
                 STATE_COLON,
@@ -625,8 +623,7 @@ static int json_scoped_parse(JsonVariant **tokens, size_t *i, size_t n, JsonVari
         assert(i);
         assert(scope);
 
-        while((e = *i < n ? tokens[(*i)++] : NULL) != NULL) {
-                JsonVariant *var = (JsonVariant *)e;
+        while((var = *i < n ? tokens[(*i)++] : NULL) != NULL) {
                 bool stopper = !json_is_value(var) && var->value.integer == terminator;
                 int r;
 
