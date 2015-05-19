@@ -841,7 +841,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 i->ancestry_job->on_progress = dkr_pull_job_on_progress;
                 i->ancestry_job->on_header = dkr_pull_job_on_header;
 
-                if (gcry_md_open(&i->ancestry_job->checsum_context, GCRY_MD_SHA256, 0)) {
+                if (gcry_md_open(&i->ancestry_job->checksum_context, GCRY_MD_SHA256, 0)) {
                         log_error_errno(r, "SHA256 failed: %m");
                         r = -ENOSYS;
                         goto finish;
