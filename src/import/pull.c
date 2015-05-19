@@ -35,6 +35,7 @@ static bool arg_force = false;
 static const char *arg_image_root = "/var/lib/machines";
 static ImportVerify arg_verify = IMPORT_VERIFY_SIGNATURE;
 static const char* arg_dkr_index_url = DEFAULT_DKR_INDEX_URL;
+static const DkrPullVersion arg_dkr_pull_version = DKR_PULL_V2;
 
 static int interrupt_signal_handler(sd_event_source *s, const struct signalfd_siginfo *si, void *userdata) {
         log_notice("Transfer aborted.");
@@ -310,7 +311,7 @@ static int pull_dkr(int argc, char *argv[], void *userdata) {
         if (r < 0)
                 return log_error_errno(r, "Failed to allocate puller: %m");
 
-        r = dkr_pull_start(pull, name, reference, local, arg_force, DKR_PULL_V2);
+        r = dkr_pull_start(pull, name, reference, local, arg_force, arg_dkr_pull_version);
         if (r < 0)
                 return log_error_errno(r, "Failed to pull image: %m");
 
@@ -333,6 +334,7 @@ static int help(int argc, char *argv[], void *userdata) {
                "                              'checksum', 'signature'.\n"
                "     --image-root=PATH        Image root directory\n"
                "     --dkr-index-url=URL      Specify index URL to use for downloads\n\n"
+               "     --dkr-pull-version=1|2   Specify the workflow to follow\n\n"
                "Commands:\n"
                "  tar URL [NAME]              Download a TAR image\n"
                "  raw URL [NAME]              Download a RAW image\n"
@@ -350,15 +352,17 @@ static int parse_argv(int argc, char *argv[]) {
                 ARG_DKR_INDEX_URL,
                 ARG_IMAGE_ROOT,
                 ARG_VERIFY,
+                ARG_DKR_PULL_VERSION,
         };
 
         static const struct option options[] = {
-                { "help",            no_argument,       NULL, 'h'                 },
-                { "version",         no_argument,       NULL, ARG_VERSION         },
-                { "force",           no_argument,       NULL, ARG_FORCE           },
-                { "dkr-index-url",   required_argument, NULL, ARG_DKR_INDEX_URL   },
-                { "image-root",      required_argument, NULL, ARG_IMAGE_ROOT      },
-                { "verify",          required_argument, NULL, ARG_VERIFY          },
+                { "help",               no_argument,       NULL, 'h'                  },
+                { "version",            no_argument,       NULL, ARG_VERSION          },
+                { "force",              no_argument,       NULL, ARG_FORCE            },
+                { "dkr-index-url",      required_argument, NULL, ARG_DKR_INDEX_URL    },
+                { "dkr-pull-version",   required_argument, NULL, ARG_DKR_PULL_VERSION },
+                { "image-root",         required_argument, NULL, ARG_IMAGE_ROOT       },
+                { "verify",             required_argument, NULL, ARG_VERIFY           },
                 {}
         };
 
@@ -403,6 +407,11 @@ static int parse_argv(int argc, char *argv[]) {
                                 return -EINVAL;
                         }
 
+                        break;
+
+                case ARG_DKR_PULL_VERSION:
+                        if (streq(optarg, "1") || streq(optarg, "v1") || streq(optarg, "V1"))
+                                arg_dkr_pull_version = DKR_PULL_V1;
                         break;
 
                 case '?':
