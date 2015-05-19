@@ -93,7 +93,7 @@ struct DkrPull {
 #define HEADER_TOKEN "X-Do" /* the HTTP header for the auth token */ "cker-Token:"
 #define HEADER_REGISTRY "X-Do" /* the HTTP header for the registry */ "cker-Endpoints:"
 #define HEADER_DIGEST "Do" /* the HTTP header for the manifest digest */ "cker-Content-Digest:"
-#define LAYERS_MAX 2048
+#define LAYERS_MAX 127
 
 static void dkr_pull_job_on_finished(PullJob *j);
 
@@ -841,6 +841,12 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 i->ancestry_job->on_progress = dkr_pull_job_on_progress;
                 i->ancestry_job->on_header = dkr_pull_job_on_header;
 
+                if (gcry_md_open(&i->ancestry_job->checsum_context, GCRY_MD_SHA256, 0)) {
+                        log_error_errno(r, "SHA256 failed: %m");
+                        r = -ENOSYS;
+                        goto finish;
+                }
+
                 r = pull_job_begin(i->ancestry_job);
                 if (r < 0) {
                         log_error_errno(r, "Failed to start ancestry job: %m");
@@ -857,6 +863,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 char *path = NULL, **k = NULL;
 
                 assert(!i->layer_job);
+
+                printf("\n#############################################\nManifest checksum: %s\n\n", j->checksum);
 
                 r = json_parse((const char *)j->payload, &doc);
                 if (r < 0) {
