@@ -883,6 +883,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 }
 
                 printf("%s", j->payload);
+                log_debug("Computed digest:\n\t%s", digest);
 
                 r = json_parse((const char *)j->payload, &doc);
                 if (r < 0) {
