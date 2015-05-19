@@ -95,22 +95,36 @@ static bool test_1(JsonVariant *v) {
         if (v->size != 6)
                 return false;
 
+        /* has k */
         p = json_variant_value(v, "k");
         if (!p || p->type != JSON_VARIANT_STRING)
                 return false;
 
+        /* k equals v */
         if (!streq(json_variant_string(p), "v"))
                 return false;
 
+        /* has foo */
         p = json_variant_value(v, "foo");
         if (!p || p->type != JSON_VARIANT_ARRAY || p->size != 3)
                 return false;
 
+        /* check  foo[0] = 1, foo[1] = 2, foo[2] = 3 */
         for (i = 0; i < 3; ++i) {
                 q = json_variant_element(p, i);
                 if (!q || q->type != JSON_VARIANT_INTEGER || json_variant_integer(q) != (i+1))
                         return false;
         }
+
+        /* has bar */
+        p = json_variant_value(v, "bar");
+        if (!p || p->type != JSON_VARIANT_OBJECT || p->size != 2)
+                return false;
+
+        /* zap is null */
+        q = json_variant_value(p, "zap");
+        if (!q || q->type != JSON_VARIANT_NULL)
+                return false;
 
         return true;
 }
