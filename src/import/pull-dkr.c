@@ -1268,7 +1268,7 @@ static int get_protocol_address(char **protocol, char **address, const char *url
         if (!a)
                 return log_oom();
 
-        log_info("%s%s", p, a);
+        log_info("%s%s [%s]", p, a, dot);
 
         *address = a;
         *protocol = p;
