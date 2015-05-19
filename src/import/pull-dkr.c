@@ -807,6 +807,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         goto finish;
                 }
 
+                printf("\n\n%s\n\n", buf);
+
                 r = json_parse(buf, &doc);
                 if (r < 0) {
                         log_error("Unable to parse bearer token\n%s", j->payload);
