@@ -856,34 +856,6 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 _cleanup_strv_free_ char **ancestry = NULL;
                 size_t allocated = 0, size = 0;
                 char *path = NULL, **k = NULL;
-                _cleanup_free_ char *digest = NULL;
-                gcry_md_hd_t hd;
-                uint8_t *bytes;
-
-                assert(!i->layer_job);
-
-                if (gcry_md_open(&hd, GCRY_MD_SHA256, 0)) {
-                        r = -ENOSYS;
-                        log_error_errno(r, "SHA256 failed: %m");
-                        goto finish;
-                }
-                gcry_md_write(hd, j->payload, j->payload_size);
-
-                bytes = gcry_md_read(hd, GCRY_MD_SHA256);
-                if (!bytes) {
-                        log_error("Failed to get checksum.");
-                        r = -EIO;
-                        goto finish;
-                }
-
-                digest = hexmem(bytes, gcry_md_get_algo_dlen(GCRY_MD_SHA256));
-                if (!digest) {
-                        r = log_oom();
-                        goto finish;
-                }
-
-                printf("%s", j->payload);
-                log_info("Computed digest:\n\t%s", digest);
 
                 r = json_parse((const char *)j->payload, &doc);
                 if (r < 0) {
