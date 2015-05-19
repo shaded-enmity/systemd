@@ -773,8 +773,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 log_info("Index lookup succeeded, directed to registry %s.", i->response_registries[0]);
                 dkr_pull_report_progress(i, DKR_RESOLVING);
 
-                url = strjoina(i->index_protocol, "auth.", i->index_address, "/token",
-                               "?scope=repository:", i->name, ":pull&service=registry.", i->index_address);
+                url = strjoina(i->index_protocol, "auth.", i->index_address, "/token?scope=repository:",
+                               i->name, ":pull&service=registry.", i->index_address);
                 r = pull_job_new(&i->tags_job, url, i->glue, i);
                 if (r < 0) {
                         log_error_errno(r, "Failed to allocate tags job: %m");

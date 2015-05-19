@@ -72,9 +72,9 @@ static void test_one(const char *data, ...) {
         va_end(ap);
 }
 
-typedef void (*FileTest)(JsonVariant *);
+typedef void (*Test)(JsonVariant *);
 
-static void test_file(const char *data, FileTest test) {
+static void test_file(const char *data, Test test) {
         JsonVariant *v = NULL;
         int r = json_parse(data, &v);
 
