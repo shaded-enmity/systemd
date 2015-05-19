@@ -863,8 +863,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 assert(!i->layer_job);
 
                 if (gcry_md_open(&hd, GCRY_MD_SHA256, 0)) {
-                        log_error_errno(r, "SHA256 failed: %m");
                         r = -ENOSYS;
+                        log_error_errno(r, "SHA256 failed: %m");
                         goto finish;
                 }
                 gcry_md_write(hd, j->payload, j->payload_size);
@@ -881,6 +881,8 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         r = log_oom();
                         goto finish;
                 }
+
+                printf("<<<\n%s\n>>>", j->payload);
 
                 printf("\n#############################################\nManifest checksum: %s\n\n", digest);
 
