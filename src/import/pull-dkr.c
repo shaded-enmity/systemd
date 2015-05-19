@@ -1260,10 +1260,9 @@ static int get_protocol_address(char **protocol, char **address, const char *url
         if (!p)
                 return log_oom();
 
-        /*dot = strrchr(dot, '.');
-        if (dot)
-                sep = dot + 1;
-*/
+        while (dot > sep && *dot != ".")
+                dot--;
+
         a = strdup(sep + 3);
         if (!a)
                 return log_oom();
