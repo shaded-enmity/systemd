@@ -123,7 +123,6 @@ static void test_1(JsonVariant *v) {
 
 static void test_2(JsonVariant *v) {
         JsonVariant *p, *q;
-        unsigned i;
 
         /* 2 keys + 2 values */
         assert_se(v->size == 4);
@@ -162,7 +161,7 @@ static void test_2(JsonVariant *v) {
 
         /* has blah */
         p = json_variant_value(v, "blah");
-        assert_se(p && p->type == JSON_VARIANT_REAL && fabs(json_variant_real(p) - 1.27) < 0.0001);
+        assert_se(p && p->type == JSON_VARIANT_REAL && fabs(json_variant_real(p) - 1.27) < 0.001);
 }
 
 int main(int argc, char *argv[]) {
