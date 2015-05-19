@@ -72,7 +72,7 @@ static void test_one(const char *data, ...) {
         va_end(ap);
 }
 
-typedef bool (*FileTest)(JsonVariant *);
+typedef void (*FileTest)(JsonVariant *);
 
 static void test_file(const char *data, FileTest test) {
         JsonVariant *v = NULL;
@@ -88,7 +88,7 @@ static void test_file(const char *data, FileTest test) {
         json_variant_unref(v);
 }
 
-static bool test_1(JsonVariant *v) {
+static void test_1(JsonVariant *v) {
         JsonVariant *p, *q;
         unsigned i;
 
@@ -130,15 +130,16 @@ static bool test_1(JsonVariant *v) {
         return true;
 }
 
-static bool test_2(JsonVariant *v) {
+static void test_2(JsonVariant *v) {
         JsonVariant *p, *q;
         unsigned i;
 
         /* 2 keys + 2 values */
-        assert_se(v->size != 4);
+        assert_se(v->size == 4);
 
+        /* 4 values */
         p = json_variant_value(v, "mutant");
-        assert_se(!p || p->type != JSON_VARIANT_ARRAY || p->size != 4);
+        assert_se(p && p->type == JSON_VARIANT_ARRAY && p->size == 4);
 
         return true;
 }
