@@ -43,7 +43,7 @@ static int json_variant_deep_copy(JsonVariant *ret, JsonVariant *variant) {
         ret->size = variant->size;
 
         if (variant->type == JSON_VARIANT_STRING) {
-                ret->string = memdup(variant->string, variant->size);
+                ret->string = strdup(variant->string, variant->size);
                 if (!ret->string)
                         return -ENOMEM;
         } else if (variant->type == JSON_VARIANT_ARRAY || variant->type == JSON_VARIANT_OBJECT) {
@@ -180,9 +180,7 @@ JsonVariant *json_variant_value(JsonVariant *variant, const char *key) {
 
         for (unsigned i = 0; i < variant->size; i += 2) {
                 JsonVariant *p = &variant->objects[i];
-                printf("\n<<< %s(%i) == %s --> %i\n", p->string, p->type == JSON_VARIANT_STRING, key, streq(p->string, key));
                 if (p->type == JSON_VARIANT_STRING && streq(key, p->string)) {
-                        printf("\n>>> %s\n", (&variant->objects[i+1])->string);
                         return &variant->objects[i + 1];
                 }
         }
