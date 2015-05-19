@@ -1255,20 +1255,18 @@ static int get_protocol_address(char **protocol, char **address, const char *url
         dot = strrchr(url, '.');
         if (!dot)
                 return -EINVAL;
+        dot--;
 
         p = strndup(url, (sep - url) + 3);
         if (!p)
                 return log_oom();
 
-        dot--;
         while (dot > (sep + 3) && *dot != '.')
                 dot--;
 
         a = strdup(dot + 1);
         if (!a)
                 return log_oom();
-
-        log_info("%s%s [%s]", p, a);
 
         *address = a;
         *protocol = p;
