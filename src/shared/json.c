@@ -664,6 +664,7 @@ static int json_scoped_parse(JsonVariant **tokens, size_t *i, size_t n, JsonVari
                                 r = json_variant_new(&v, type);
                                 if (r < 0)
                                         goto error;
+
                                 r = json_scoped_parse(tokens, i, n, v);
                                 if (r < 0)
                                         goto error;
@@ -684,6 +685,7 @@ static int json_scoped_parse(JsonVariant **tokens, size_t *i, size_t n, JsonVari
                                 r = json_variant_deep_copy(&items[size], key);
                                 if (r < 0)
                                         goto error;
+
                                 r = json_variant_deep_copy(&items[size+1], value);
                                 if (r < 0)
                                         goto error;

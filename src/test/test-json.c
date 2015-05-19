@@ -72,13 +72,18 @@ static void test_one(const char *data, ...) {
         va_end(ap);
 }
 
-static void test_file(const char *data) {
+typedef bool (*FileTest)(JsonVariant *);
+
+static void test_file(const char *data, FileTest test) {
         JsonVariant *v = NULL;
         int r = json_parse(data, &v);
 
         assert_se(r == 0);
         assert_se(v != NULL);
         assert_se(v->type == JSON_VARIANT_OBJECT);
+
+        if (test)
+                assert_se(test(v));
 
         json_variant_unref(v);
 }
@@ -115,8 +120,8 @@ int main(int argc, char *argv[]) {
 
         test_one("[1, 2]", JSON_ARRAY_OPEN, JSON_INTEGER, 1, JSON_COMMA, JSON_INTEGER, 2, JSON_ARRAY_CLOSE, JSON_END);
 
-        test_file("{\"k\": \"v\", \"foo\": [1, 2, 3], \"bar\": {\"zap\": null}}");
-        test_file("{\"mutant\": [1, null, \"1\", {\"1\": [1, \"1\"]}], \"blah\": 1.27}");
+        test_file("{\"k\": \"v\", \"foo\": [1, 2, 3], \"bar\": {\"zap\": null}}", NULL);
+        test_file("{\"mutant\": [1, null, \"1\", {\"1\": [1, \"1\"]}], \"blah\": 1.27}", NULL);
 
         return 0;
 }
