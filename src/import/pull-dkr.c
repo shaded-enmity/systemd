@@ -807,8 +807,6 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                         goto finish;
                 }
 
-                printf("\n\n%s\n\n", buf);
-
                 r = json_parse(buf, &doc);
                 if (r < 0) {
                         log_error("Unable to parse bearer token\n%s", j->payload);
@@ -818,7 +816,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 e = json_variant_value(doc, "token");
                 if (!e || e->type != JSON_VARIANT_STRING) {
                         r = -EBADMSG;
-                        log_error("Invalid JSON format for Bearer token [%p, %s, %i]", e, doc->objects[0].string);
+                        log_error("Invalid JSON format for Bearer token");
                         goto finish;
                 }
 
