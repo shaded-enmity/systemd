@@ -858,7 +858,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 char *path = NULL, **k = NULL;
                 _cleanup_free_ char *digest = NULL;
                 gcry_md_hd_t hd;
-                uint8_t *k;
+                uint8_t *bytes;
 
                 assert(!i->layer_job);
 
@@ -869,14 +869,14 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 }
                 gcry_md_write(hd, j->payload, j->payload_size);
 
-                k = gcry_md_read(hd, GCRY_MD_SHA256);
-                if (!k) {
+                bytes = gcry_md_read(hd, GCRY_MD_SHA256);
+                if (!bytes) {
                         log_error("Failed to get checksum.");
                         r = -EIO;
                         goto finish;
                 }
 
-                digest = hexmem(k, gcry_md_get_algo_dlen(GCRY_MD_SHA256));
+                digest = hexmem(bytes, gcry_md_get_algo_dlen(GCRY_MD_SHA256));
                 if (!digest) {
                         r = log_oom();
                         goto finish;
