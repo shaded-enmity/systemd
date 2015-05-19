@@ -1262,7 +1262,7 @@ static int get_protocol_address(char **protocol, char **address, const char *url
 
         dot = strrchr(dot, '.');
         if (dot)
-                sel = dot + 1;
+                sep = dot + 1;
 
         a = strdup(sep + 3);
         if (!a)
