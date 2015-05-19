@@ -818,7 +818,7 @@ static void dkr_pull_job_on_finished_v2(PullJob *j) {
                 e = json_variant_value(doc, "token");
                 if (!e || e->type != JSON_VARIANT_STRING) {
                         r = -EBADMSG;
-                        log_error("Invalid JSON format for Bearer token [%p, %u, %i, %i]", e, doc->objects[0].type, doc->objects[1].type);
+                        log_error("Invalid JSON format for Bearer token [%p, %s, %i]", e, doc->objects[0].string);
                         goto finish;
                 }
 
